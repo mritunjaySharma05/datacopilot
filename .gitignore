@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Env / secrets
+.env
+
+# Data (large files)
+data/raw/*
+data/processed/*
+data/benchmarks/*
+!data/**/.gitkeep
+*.duckdb
+*.sqlite
+*.db
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code (local only)
+CLAUDE.md
+.claude/

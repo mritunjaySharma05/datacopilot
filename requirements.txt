@@ -1,0 +1,15 @@
+pandas
+numpy
+duckdb
+sqlalchemy
+sqlglot
+scikit-learn
+xgboost
+fastapi
+uvicorn
+streamlit
+plotly
+openpyxl
+python-dotenv
+requests
+pytest
