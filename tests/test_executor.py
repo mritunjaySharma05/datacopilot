@@ -47,6 +47,13 @@ def test_run_query_runs_union_all(conn):
     assert len(df) == 8
 
 
+def test_run_query_runs_intersect_and_except(conn):
+    both = run_query(conn, "SELECT city FROM sales WHERE product = 'Phone' INTERSECT SELECT city FROM sales WHERE product = 'Laptop'")
+    assert both["city"].tolist() == ["Delhi"]
+    only_phone = run_query(conn, "SELECT city FROM sales WHERE product = 'Phone' EXCEPT SELECT city FROM sales WHERE product = 'Laptop'")
+    assert only_phone["city"].tolist() == ["Mumbai"]
+
+
 def test_run_query_refuses_writes(conn):
     with pytest.raises(ValueError):
         run_query(conn, "DELETE FROM sales")

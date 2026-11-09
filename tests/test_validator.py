@@ -56,9 +56,41 @@ def test_select_into_is_blocked():
     assert not is_read_only("SELECT city FROM sales UNION SELECT city INTO backup FROM sales")
 
 
-def test_intersect_and_except_still_blocked():
-    assert not is_read_only("SELECT city FROM sales INTERSECT SELECT city FROM sales")
-    assert not is_read_only("SELECT city FROM sales EXCEPT SELECT city FROM sales")
+def test_intersect_is_allowed():
+    assert is_read_only("SELECT city FROM sales INTERSECT SELECT city FROM sales")
+
+
+def test_except_is_allowed():
+    assert is_read_only("SELECT city FROM sales EXCEPT SELECT city FROM sales")
+
+
+def test_mixed_set_operations_with_parentheses_are_allowed():
+    sql = (
+        "(SELECT city FROM sales UNION SELECT product FROM sales) "
+        "EXCEPT (SELECT city FROM sales WHERE revenue < 1000) ORDER BY 1"
+    )
+    assert is_read_only(sql)
+
+
+def test_intersect_followed_by_write_is_blocked():
+    assert not is_read_only("SELECT city FROM sales INTERSECT SELECT city FROM sales; DROP TABLE sales")
+
+
+def test_except_with_write_in_cte_is_blocked():
+    sql = (
+        "WITH d AS (DELETE FROM sales RETURNING city) "
+        "SELECT city FROM sales EXCEPT SELECT city FROM d"
+    )
+    assert not is_read_only(sql)
+
+
+def test_select_into_in_intersect_branch_is_blocked():
+    assert not is_read_only("SELECT city FROM sales INTERSECT SELECT city INTO backup FROM sales")
+
+
+def test_check_schema_covers_except_branches(schema):
+    sql = "SELECT city FROM sales EXCEPT SELECT price FROM orders"
+    assert check_schema(sql, schema) == {"tables": ["orders"], "columns": ["price"]}
 
 
 def test_check_schema_covers_union_branches(schema):

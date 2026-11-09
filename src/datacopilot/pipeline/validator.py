@@ -8,18 +8,18 @@ DIALECT = "duckdb"
 
 
 def _is_select_query(node: exp.Expression) -> bool:
-    """True for a SELECT, or a UNION / UNION ALL whose every branch is one."""
+    """True for a SELECT, or a UNION / INTERSECT / EXCEPT whose every branch is one."""
     if isinstance(node, exp.Subquery):  # parenthesized branch: (SELECT ...)
         return _is_select_query(node.this)
     if isinstance(node, exp.Select):
         return True
-    if isinstance(node, exp.Union):
+    if isinstance(node, exp.SetOperation):  # Union, Intersect, Except
         return _is_select_query(node.left) and _is_select_query(node.right)
     return False
 
 
 def is_read_only(sql: str) -> bool:
-    """Return True if `sql` is a single read-only SELECT (UNION / UNION ALL allowed)."""
+    """Return True if `sql` is a single read-only SELECT (UNION / INTERSECT / EXCEPT allowed)."""
     try:
         statements = sqlglot.parse(sql)
     except sqlglot.errors.ParseError:
