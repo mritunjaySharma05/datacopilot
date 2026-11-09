@@ -22,23 +22,46 @@ from datacopilot.pipeline.sql_generator import generate_sql  # noqa: E402
 from datacopilot.pipeline.validator import validate  # noqa: E402
 
 
-def get_valid_sql(
-    question: str, schema: dict, generate: Callable[..., str] | None = None
-) -> str:
-    """Generate SQL and validate it, retrying once with the validator's error message.
+class SQLAttemptError(Exception):
+    """Generated SQL was rejected by the validator or failed when executed."""
 
-    `generate` defaults to the Ollama-backed generate_sql. Raises ValueError if the
-    second attempt is still invalid.
+
+def try_sql(
+    conn: duckdb.DuckDBPyConnection, sql: str, schema: dict
+) -> pd.DataFrame:
+    """Validate then execute `sql`; raise SQLAttemptError with a message the LLM can act on."""
+    problems = validate(sql, schema)
+    if problems:
+        raise SQLAttemptError(f"Validation failed: {' '.join(problems)}")
+    try:
+        return run_query(conn, sql)
+    except duckdb.Error as err:
+        raise SQLAttemptError(f"Execution failed: {err}") from err
+
+
+def answer(
+    conn: duckdb.DuckDBPyConnection,
+    question: str,
+    schema: dict,
+    generate: Callable[..., str] | None = None,
+) -> tuple[str, pd.DataFrame]:
+    """Generate, validate and run SQL, retrying once with the validation or execution error.
+
+    `generate` defaults to the Ollama-backed generate_sql. Raises SQLAttemptError if the
+    second attempt also fails.
     """
     generate = generate or generate_sql
     sql = generate(question, schema)
-    problems = validate(sql, schema)
-    if problems:
-        sql = generate(question, schema, feedback=" ".join(problems))
-        problems = validate(sql, schema)
-    if problems:
-        raise ValueError(f"Generated SQL failed validation: {' '.join(problems)}\n{sql}")
-    return sql
+    try:
+        return sql, try_sql(conn, sql, schema)
+    except SQLAttemptError as err:
+        feedback = str(err)
+
+    sql = generate(question, schema, feedback=feedback)
+    try:
+        return sql, try_sql(conn, sql, schema)
+    except SQLAttemptError as err:
+        raise SQLAttemptError(f"{err} (after one retry)\n{sql}") from err
 
 
 def ask(
@@ -48,9 +71,7 @@ def ask(
     conn = duckdb.connect()
     try:
         load_csv(conn, csv_path)
-        schema = get_schema(conn)
-        sql = get_valid_sql(question, schema, generate)
-        return sql, run_query(conn, sql)
+        return answer(conn, question, get_schema(conn), generate)
     finally:
         conn.close()
 
@@ -70,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     except requests.ConnectionError:
         print("Could not reach Ollama. Is it running? (check OLLAMA_HOST in .env)", file=sys.stderr)
         return 1
-    except (ValueError, duckdb.Error) as err:
+    except (SQLAttemptError, duckdb.Error) as err:
         print(f"Error: {err}", file=sys.stderr)
         return 1
 
