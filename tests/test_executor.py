@@ -42,6 +42,11 @@ def test_run_query_custom_limit(conn):
     assert len(run_query(conn, "SELECT * FROM sales", limit=2)) == 2
 
 
+def test_run_query_runs_union_all(conn):
+    df = run_query(conn, "SELECT city AS name FROM sales UNION ALL SELECT product FROM sales")
+    assert len(df) == 8
+
+
 def test_run_query_refuses_writes(conn):
     with pytest.raises(ValueError):
         run_query(conn, "DELETE FROM sales")

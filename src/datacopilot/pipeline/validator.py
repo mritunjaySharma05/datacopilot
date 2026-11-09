@@ -2,18 +2,30 @@
 import sqlglot
 from sqlglot import exp
 
-FORBIDDEN = (exp.Insert, exp.Update, exp.Delete, exp.Drop, exp.Create, exp.Alter)
+# exp.Into covers SELECT ... INTO new_table, which creates a table in PostgreSQL.
+FORBIDDEN = (exp.Insert, exp.Update, exp.Delete, exp.Drop, exp.Create, exp.Alter, exp.Into)
 DIALECT = "duckdb"
 
 
+def _is_select_query(node: exp.Expression) -> bool:
+    """True for a SELECT, or a UNION / UNION ALL whose every branch is one."""
+    if isinstance(node, exp.Subquery):  # parenthesized branch: (SELECT ...)
+        return _is_select_query(node.this)
+    if isinstance(node, exp.Select):
+        return True
+    if isinstance(node, exp.Union):
+        return _is_select_query(node.left) and _is_select_query(node.right)
+    return False
+
+
 def is_read_only(sql: str) -> bool:
-    """Return True if every statement in `sql` is a read-only SELECT."""
+    """Return True if `sql` is a single read-only SELECT (UNION / UNION ALL allowed)."""
     try:
         statements = sqlglot.parse(sql)
     except sqlglot.errors.ParseError:
         return False
     for stmt in statements:
-        if stmt is None or not isinstance(stmt, exp.Select):
+        if stmt is None or not _is_select_query(stmt):
             return False
         if any(stmt.find(node) for node in FORBIDDEN):
             return False

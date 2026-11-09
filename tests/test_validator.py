@@ -23,6 +23,49 @@ def test_cte_select_is_allowed():
     assert is_read_only("WITH t AS (SELECT city FROM sales) SELECT city FROM t")
 
 
+def test_union_is_allowed():
+    assert is_read_only("SELECT city FROM sales UNION SELECT product FROM sales")
+
+
+def test_union_all_is_allowed():
+    assert is_read_only("SELECT city FROM sales UNION ALL SELECT product FROM sales")
+
+
+def test_chained_parenthesized_union_with_order_is_allowed():
+    sql = (
+        "(SELECT city AS name FROM sales) UNION ALL (SELECT product FROM sales) "
+        "UNION SELECT 'total' ORDER BY name LIMIT 5"
+    )
+    assert is_read_only(sql)
+
+
+def test_union_followed_by_write_is_blocked():
+    assert not is_read_only("SELECT city FROM sales UNION SELECT city FROM sales; DELETE FROM sales")
+
+
+def test_union_with_write_in_cte_is_blocked():
+    sql = (
+        "WITH d AS (DELETE FROM sales RETURNING city) "
+        "SELECT city FROM d UNION SELECT city FROM sales"
+    )
+    assert not is_read_only(sql)
+
+
+def test_select_into_is_blocked():
+    assert not is_read_only("SELECT * INTO backup FROM sales")
+    assert not is_read_only("SELECT city FROM sales UNION SELECT city INTO backup FROM sales")
+
+
+def test_intersect_and_except_still_blocked():
+    assert not is_read_only("SELECT city FROM sales INTERSECT SELECT city FROM sales")
+    assert not is_read_only("SELECT city FROM sales EXCEPT SELECT city FROM sales")
+
+
+def test_check_schema_covers_union_branches(schema):
+    sql = "SELECT city FROM sales UNION SELECT price FROM orders"
+    assert check_schema(sql, schema) == {"tables": ["orders"], "columns": ["price"]}
+
+
 # --- check_schema ---
 
 def test_check_schema_clean_query(schema):
