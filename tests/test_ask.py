@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
-ASK_PATH = Path(__file__).resolve().parents[1] / "scripts" / "ask.py"
+ROOT = Path(__file__).resolve().parents[1]
+ASK_PATH = ROOT / "scripts" / "ask.py"
+SAMPLE_CSV = ROOT / "data" / "sample" / "sales.csv"
 spec = importlib.util.spec_from_file_location("ask", ASK_PATH)
 ask_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ask_module)
@@ -71,6 +73,14 @@ def test_main_ollama_unreachable(sales_csv, monkeypatch, capsys):
     monkeypatch.setattr(ask_module, "generate_sql", down)
     assert ask_module.main([str(sales_csv), "q"]) == 1
     assert "Could not reach Ollama" in capsys.readouterr().err
+
+
+def test_main_on_bundled_sample(monkeypatch, capsys):
+    monkeypatch.setattr(
+        ask_module, "generate_sql", lambda q, s, feedback=None: "SELECT COUNT(*) AS n FROM sales"
+    )
+    assert ask_module.main([str(SAMPLE_CSV), "how many rows?"]) == 0
+    assert "50" in capsys.readouterr().out
 
 
 def test_main_missing_file(capsys):

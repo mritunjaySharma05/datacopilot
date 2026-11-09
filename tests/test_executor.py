@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import duckdb
 import pytest
 
@@ -13,6 +15,15 @@ def test_load_csv_creates_table(sales_csv):
     con = duckdb.connect()
     assert load_csv(con, sales_csv) == "sales"
     assert con.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 4
+
+
+def test_bundled_sample_loads():
+    sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "sales.csv"
+    con = duckdb.connect()
+    assert load_csv(con, sample) == "sales"
+    assert con.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 50
+    columns = [r[0] for r in con.execute("DESCRIBE sales").fetchall()]
+    assert columns == ["date", "city", "product", "quantity", "revenue"]
 
 
 def test_run_query_returns_dataframe(conn):

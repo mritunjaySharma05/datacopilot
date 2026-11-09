@@ -1,7 +1,8 @@
 """Ask a question about a CSV file from the command line.
 
 Usage:
-    python scripts/ask.py data/raw/sales.csv "Which city had the highest revenue?"
+    python scripts/ask.py data/sample/sales.csv "Which city had the highest revenue?"
+    python scripts/ask.py data/sample/sales.csv "har product ki total quantity kitni biki?"
 """
 import argparse
 import sys
