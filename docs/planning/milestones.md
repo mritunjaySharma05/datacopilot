@@ -2,9 +2,9 @@
 
 | Module | Milestone | Status |
 |---|---|---|
-| 1 | Proposal, charter, architecture, repo setup | In progress |
-| 2 | Requirements, research review, detailed design, basic prototype | Not started |
-| 3 | BIRD dev set + CSV / Hinglish / unanswerable question sets, EDA | Not started |
+| 1 | Proposal, charter, architecture, repo setup | Submitted |
+| 2 | Requirements, research review, detailed design, basic prototype | Submitted |
+| 3 | BIRD dev set + CSV / Hinglish / unanswerable question sets, EDA | In progress |
 | 4 | Answerability classifier + baseline vs validated pipeline experiments | Not started |
 | 5 | Docker + AWS/GCP deployment, login, logging | Not started |
 | 6 | End-to-end integration, charts, auto insights | Not started |
