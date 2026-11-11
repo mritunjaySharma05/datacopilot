@@ -13,3 +13,7 @@ openpyxl
 python-dotenv
 requests
 pytest
+matplotlib
+nbformat
+nbconvert
+ipykernel
