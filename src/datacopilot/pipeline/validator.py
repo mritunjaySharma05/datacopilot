@@ -18,10 +18,13 @@ def _is_select_query(node: exp.Expression) -> bool:
     return False
 
 
-def is_read_only(sql: str) -> bool:
-    """Return True if `sql` is a single read-only SELECT (UNION / INTERSECT / EXCEPT allowed)."""
+def is_read_only(sql: str, dialect: str | None = None) -> bool:
+    """Return True if `sql` is a single read-only SELECT (UNION / INTERSECT / EXCEPT allowed).
+
+    `dialect` is the sqlglot dialect to parse with (e.g. "sqlite" for backtick identifiers).
+    """
     try:
-        statements = sqlglot.parse(sql)
+        statements = sqlglot.parse(sql, read=dialect)
     except sqlglot.errors.ParseError:
         return False
     for stmt in statements:
@@ -32,13 +35,15 @@ def is_read_only(sql: str) -> bool:
     return True
 
 
-def check_schema(sql: str, schema: dict[str, list[dict]]) -> dict[str, list[str]]:
+def check_schema(
+    sql: str, schema: dict[str, list[dict]], dialect: str = DIALECT
+) -> dict[str, list[str]]:
     """Return {"tables": [...], "columns": [...]} that `sql` uses but `schema` lacks.
 
-    Names are compared case-insensitively (DuckDB identifiers are). Names that the
+    Names are compared case-insensitively (DuckDB and SQLite identifiers are). Names that the
     query defines itself (CTEs, table aliases, SELECT aliases) are not reported.
     """
-    tree = sqlglot.parse_one(sql, read=DIALECT)
+    tree = sqlglot.parse_one(sql, read=dialect)
     known = {t.lower(): {c["name"].lower() for c in cols} for t, cols in schema.items()}
     all_columns = set().union(*known.values()) if known else set()
 
@@ -47,13 +52,20 @@ def check_schema(sql: str, schema: dict[str, list[dict]]) -> dict[str, list[str]
 
     unknown_tables: list[str] = []
     alias_to_table: dict[str, str] = {}
+    used_tables: set[str] = set()
     for table in tree.find_all(exp.Table):
         name = table.name.lower()
         if name in ctes:
             continue
-        if name not in known and table.name not in unknown_tables:
+        if name in known:
+            used_tables.add(name)
+        elif table.name not in unknown_tables:
             unknown_tables.append(table.name)
         alias_to_table[table.alias_or_name.lower()] = name
+
+    # Unqualified columns must exist in a table the query actually uses. (SQLite would
+    # otherwise turn an unknown "quoted" name into a string literal and return wrong data.)
+    in_scope = set().union(*(known[t] for t in used_tables)) if used_tables else all_columns
 
     unknown_columns: list[str] = []
     for column in tree.find_all(exp.Column):
@@ -67,20 +79,38 @@ def check_schema(sql: str, schema: dict[str, list[dict]]) -> dict[str, list[str]
         elif qualifier:
             ok = True  # qualified by a CTE/subquery we don't track, or an unknown table
         else:
-            ok = name in all_columns
-        if not ok and column.sql() not in unknown_columns:
-            unknown_columns.append(column.sql())
+            ok = name in in_scope
+        shown = column.sql(dialect=dialect)
+        if not ok and shown not in unknown_columns:
+            unknown_columns.append(shown)
 
     return {"tables": unknown_tables, "columns": unknown_columns}
 
 
-def validate(sql: str, schema: dict[str, list[dict]]) -> list[str]:
+def find_syntax_error(sql: str, dialect: str | None = DIALECT) -> str | None:
+    """Return a short message locating the first parse error, or None if `sql` parses."""
+    try:
+        sqlglot.parse(sql, read=dialect)
+    except sqlglot.errors.ParseError as err:
+        if not err.errors:
+            return f"SQL syntax error: {str(err).splitlines()[0]}"
+        first = err.errors[0]
+        near = (first.get("highlight") or "").strip()
+        where = f" near '{near}'" if near else ""
+        return f"SQL syntax error{where} (line {first.get('line')}, column {first.get('col')})."
+    return None
+
+
+def validate(sql: str, schema: dict[str, list[dict]], dialect: str = DIALECT) -> list[str]:
     """Return a list of human-readable problems with `sql`; empty means it is safe to run."""
     if not sql.strip():
         return ["No SQL was produced."]
-    if not is_read_only(sql):
+    syntax_error = find_syntax_error(sql, dialect)
+    if syntax_error:
+        return [syntax_error]
+    if not is_read_only(sql, dialect):
         return ["Only a single read-only SELECT query is allowed."]
-    unknown = check_schema(sql, schema)
+    unknown = check_schema(sql, schema, dialect)
     problems = []
     if unknown["tables"]:
         problems.append(f"Unknown tables: {', '.join(unknown['tables'])}.")

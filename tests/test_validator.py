@@ -1,4 +1,4 @@
-from datacopilot.pipeline.validator import check_schema, is_read_only, validate
+from datacopilot.pipeline.validator import check_schema, find_syntax_error, is_read_only, validate
 
 
 # --- is_read_only ---
@@ -151,3 +151,58 @@ def test_validate_reports_unknown_names(schema):
     problems = validate("SELECT price FROM orders", schema)
     assert "Unknown tables: orders." in problems
     assert "Unknown columns: price." in problems
+
+
+# --- SQLite dialect ---
+
+def test_is_read_only_sqlite_backticks():
+    sql = "SELECT `Free Meal Count (K-12)` FROM frpm"
+    assert is_read_only(sql, "sqlite")
+
+
+def test_check_schema_sqlite_backtick_columns():
+    schema = {"frpm": [{"name": "Free Meal Count (K-12)", "type": "REAL", "samples": []}]}
+    ok = "SELECT `Free Meal Count (K-12)` FROM frpm"
+    bad = "SELECT `Free Meal Count` FROM frpm"
+    assert check_schema(ok, schema, "sqlite") == {"tables": [], "columns": []}
+    assert check_schema(bad, schema, "sqlite")["columns"] == ['"Free Meal Count"']
+
+
+def test_validate_sqlite_blocks_writes():
+    assert validate("DELETE FROM frpm", {"frpm": []}, "sqlite") == [
+        "Only a single read-only SELECT query is allowed."
+    ]
+
+
+# --- syntax errors and column scope ---
+
+def test_find_syntax_error_locates_problem():
+    sql = "SELECT T1.School Type FROM frpm AS T1 WHERE T1.School Type = 'x'"
+    msg = find_syntax_error(sql, "sqlite")
+    assert msg.startswith("SQL syntax error near 'Type'")
+    assert "line 1" in msg
+
+
+def test_find_syntax_error_none_for_valid_sql():
+    assert find_syntax_error("SELECT city FROM sales") is None
+
+
+def test_validate_reports_syntax_error_not_read_only(schema):
+    problems = validate("SELECT city FROM sales WHERE city Name = 'x'", schema)
+    assert len(problems) == 1
+    assert problems[0].startswith("SQL syntax error")
+
+
+def test_check_schema_unqualified_column_must_be_in_used_tables():
+    schema = {
+        "frpm": [{"name": "CDSCode", "type": "TEXT", "samples": []}],
+        "schools": [
+            {"name": "CDSCode", "type": "TEXT", "samples": []},
+            {"name": "MailStreet", "type": "TEXT", "samples": []},
+        ],
+    }
+    # MailStreet exists, but not in frpm (the only table used). SQLite would silently
+    # return the string 'MailStreet' for the double-quoted name.
+    assert check_schema('SELECT "MailStreet" FROM frpm', schema, "sqlite")["columns"] == ['"MailStreet"']
+    joined = 'SELECT "MailStreet" FROM frpm JOIN schools ON frpm.CDSCode = schools.CDSCode'
+    assert check_schema(joined, schema, "sqlite")["columns"] == []
