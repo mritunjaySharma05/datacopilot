@@ -1,4 +1,4 @@
-"""SQL generator: ask a local Ollama model to turn a question into DuckDB SQL."""
+"""SQL generator: ask a local Ollama model to turn a question into SQL (DuckDB or SQLite)."""
 import os
 import re
 
@@ -12,8 +12,11 @@ load_dotenv()
 DEFAULT_HOST = "http://localhost:11434"
 DEFAULT_MODEL = "qwen2.5-coder:7b"
 REQUEST_TIMEOUT_S = 120
+# Ollama's default context window is small; wide schemas would be silently truncated.
+DEFAULT_NUM_CTX = 8192
+DIALECT_NAMES = {"duckdb": "DuckDB", "sqlite": "SQLite"}
 
-PROMPT_TEMPLATE = """You write DuckDB SQL for data analysis.
+PROMPT_TEMPLATE = """You write {dialect} SQL for data analysis.
 Use only the tables and columns in this schema:
 
 {schema}
@@ -21,8 +24,9 @@ Use only the tables and columns in this schema:
 Rules:
 - Write exactly one read-only SELECT query (WITH ... SELECT is fine).
 - Use only the columns listed above.
+- Quote column names that contain spaces or special characters.
 - Return only the SQL inside a ```sql code block, with no explanation.
-{feedback}
+{feedback}{hint}
 Question: {question}
 """
 
@@ -30,13 +34,28 @@ _CODE_BLOCK = re.compile(r"```(?:sql)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 _SQL_START = re.compile(r"\b(SELECT|WITH)\b", re.IGNORECASE)
 
 
-def build_prompt(question: str, schema: dict, feedback: str | None = None) -> str:
-    """Build the LLM prompt; `feedback` explains why the previous SQL was rejected."""
+def build_prompt(
+    question: str,
+    schema: dict,
+    feedback: str | None = None,
+    evidence: str | None = None,
+    dialect: str = "duckdb",
+) -> str:
+    """Build the LLM prompt.
+
+    `feedback` explains why the previous SQL was rejected; `evidence` is a domain hint
+    (e.g. BIRD's evidence field); `dialect` is "duckdb" or "sqlite".
+    """
     feedback_text = ""
     if feedback:
         feedback_text = f"\nYour previous query was rejected: {feedback}\nFix it.\n"
+    hint_text = f"\nHint: {evidence}\n" if evidence else ""
     return PROMPT_TEMPLATE.format(
-        schema=format_schema(schema), feedback=feedback_text, question=question
+        dialect=DIALECT_NAMES.get(dialect, dialect),
+        schema=format_schema(schema),
+        feedback=feedback_text,
+        hint=hint_text,
+        question=question,
     )
 
 
@@ -57,6 +76,7 @@ def extract_sql(text: str) -> str:
 
 def _call_ollama(prompt: str) -> str:
     """Send `prompt` to Ollama with temperature 0 and return the raw reply text."""
+    num_ctx = int(os.getenv("OLLAMA_NUM_CTX", DEFAULT_NUM_CTX))
     host = os.getenv("OLLAMA_HOST", DEFAULT_HOST).rstrip("/")
     model = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
     response = requests.post(
@@ -65,7 +85,7 @@ def _call_ollama(prompt: str) -> str:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0},
+            "options": {"temperature": 0, "num_ctx": num_ctx},
         },
         timeout=REQUEST_TIMEOUT_S,
     )
@@ -73,6 +93,13 @@ def _call_ollama(prompt: str) -> str:
     return response.json()["response"]
 
 
-def generate_sql(question: str, schema: dict, feedback: str | None = None) -> str:
+def generate_sql(
+    question: str,
+    schema: dict,
+    feedback: str | None = None,
+    evidence: str | None = None,
+    dialect: str = "duckdb",
+) -> str:
     """Return one SQL query answering `question` over `schema`."""
-    return extract_sql(_call_ollama(build_prompt(question, schema, feedback)))
+    prompt = build_prompt(question, schema, feedback, evidence, dialect)
+    return extract_sql(_call_ollama(prompt))

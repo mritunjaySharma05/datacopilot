@@ -99,3 +99,34 @@ def test_generate_sql_propagates_http_errors(monkeypatch, schema):
     monkeypatch.setattr(sql_generator, "_call_ollama", boom)
     with pytest.raises(sql_generator.requests.ConnectionError):
         generate_sql("q", schema)
+
+
+def test_build_prompt_default_dialect_is_duckdb(schema):
+    assert build_prompt("q", schema).startswith("You write DuckDB SQL")
+
+
+def test_build_prompt_sqlite_dialect_and_evidence(schema):
+    prompt = build_prompt("q", schema, evidence="rate = free / enrollment", dialect="sqlite")
+    assert prompt.startswith("You write SQLite SQL")
+    assert "Hint: rate = free / enrollment" in prompt
+
+
+def test_build_prompt_without_evidence_has_no_hint(schema):
+    assert "Hint:" not in build_prompt("q", schema)
+
+
+def test_call_ollama_sets_context_window(monkeypatch):
+    monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
+    response = MagicMock()
+    response.json.return_value = {"response": "SELECT 1"}
+    post = MagicMock(return_value=response)
+    monkeypatch.setattr(sql_generator.requests, "post", post)
+    sql_generator._call_ollama("hello")
+    assert post.call_args.kwargs["json"]["options"]["num_ctx"] == 4096
+
+
+def test_generate_sql_passes_evidence_and_dialect(monkeypatch, schema):
+    seen = {}
+    monkeypatch.setattr(sql_generator, "_call_ollama", lambda p: seen.setdefault("p", p) and "SELECT 1")
+    generate_sql("q", schema, evidence="hint here", dialect="sqlite")
+    assert "SQLite" in seen["p"] and "Hint: hint here" in seen["p"]
