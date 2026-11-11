@@ -40,3 +40,33 @@ def test_format_schema_mentions_table_columns_and_samples():
     assert "Table sales:" in text
     assert "city (VARCHAR)" in text
     assert "'Delhi'" in text
+
+
+def test_get_sqlite_schema(tiny_sqlite):
+    from datacopilot.pipeline.executor import connect_sqlite
+    from datacopilot.pipeline.profiler import get_sqlite_schema
+
+    schema = get_sqlite_schema(connect_sqlite(tiny_sqlite))
+    assert list(schema) == ["items", "orders"]
+    items = {c["name"]: c for c in schema["items"]}
+    assert list(items) == ["id", "Item Name", "price"]
+    assert items["price"]["type"] == "REAL"
+    assert items["price"]["samples"] == [10.0, 2.5]  # NULL skipped
+
+
+def test_get_sqlite_schema_skips_internal_tables(tmp_path):
+    import sqlite3
+
+    from datacopilot.pipeline.profiler import get_sqlite_schema
+
+    con = sqlite3.connect(tmp_path / "a.sqlite")
+    con.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, v TEXT)")
+    con.execute("INSERT INTO t (v) VALUES ('x')")
+    assert list(get_sqlite_schema(con)) == ["t"]  # sqlite_sequence is hidden
+
+
+def test_format_schema_truncates_long_samples():
+    schema = {"t": [{"name": "notes", "type": "TEXT", "samples": ["x" * 500]}]}
+    text = format_schema(schema)
+    assert "x" * 500 not in text
+    assert "..." in text

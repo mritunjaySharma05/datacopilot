@@ -1,9 +1,10 @@
+import sqlite3
 from pathlib import Path
 
 import duckdb
 import pytest
 
-from datacopilot.pipeline.executor import load_csv, run_query, table_name_for
+from datacopilot.pipeline.executor import connect_sqlite, load_csv, run_query, table_name_for
 
 
 def test_table_name_for_sanitizes():
@@ -58,3 +59,36 @@ def test_run_query_refuses_writes(conn):
     with pytest.raises(ValueError):
         run_query(conn, "DELETE FROM sales")
     assert conn.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 4
+
+
+# --- SQLite (read-only) ---
+
+def test_connect_sqlite_reads(tiny_sqlite):
+    con = connect_sqlite(tiny_sqlite)
+    df = run_query(con, "SELECT `Item Name` FROM items ORDER BY id", dialect="sqlite")
+    assert df["Item Name"].tolist() == ["Pen", "Pencil", "Eraser"]
+
+
+def test_connect_sqlite_is_read_only_at_db_level(tiny_sqlite):
+    con = connect_sqlite(tiny_sqlite)
+    with pytest.raises(sqlite3.OperationalError, match="readonly"):
+        con.execute("DELETE FROM items")
+    assert con.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 3
+
+
+def test_connect_sqlite_missing_file(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        connect_sqlite(tmp_path / "nope.sqlite")
+
+
+def test_connect_sqlite_timeout_interrupts_long_query(tiny_sqlite):
+    con = connect_sqlite(tiny_sqlite, timeout_s=0.2)
+    endless = "WITH RECURSIVE r(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM r) SELECT MAX(x) FROM r"
+    with pytest.raises(sqlite3.OperationalError, match="timed out"):
+        con.execute(endless).fetchall()
+    # The connection stays usable for the next statement.
+    assert con.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 3
+
+
+def test_run_query_limit_none_returns_everything(conn):
+    assert len(run_query(conn, "SELECT * FROM range(2500)", limit=None)) == 2500
