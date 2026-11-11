@@ -10,7 +10,7 @@ Checked on 2026-11-11. Sizes are what the script downloaded on that date.
 |---|---|---|---|---|
 | Olist Brazilian E-commerce | `data/raw/olist/` | CC BY-NC-SA 4.0 | 44.7 MB zip | 126 MB CSV |
 | IPL (Cricsheet) | `data/raw/ipl/` | ODC-By 1.0 | 6.9 MB zip | 95 MB CSV |
-| Crop production (data.gov.in) | `data/raw/crop_production/` | GODL-India | needs API key | not downloaded yet |
+| Crop production (Kaggle mirror of data.gov.in) | `data/raw/crop_production/` | GODL-India (underlying data); mirror states none | 15.3 MB CSV (manual) | 15.3 MB CSV |
 | F1 World Championship (Jolpica-F1) | `data/raw/f1/` | CC BY-NC-SA 4.0 | 14.7 MB zip | 45 MB CSV |
 
 ## Licence notes for this project
@@ -20,7 +20,7 @@ Checked on 2026-11-11. Sizes are what the script downloaded on that date.
   of the public repo and the deployed app's downloadable content.
 - **Attribution (all four):** the final report and the app's About page should credit
   Olist, Cricsheet, data.gov.in (Ministry of Agriculture and Farmers Welfare) and
-  Jolpica-F1, with links.
+  Jolpica-F1, with links. For crop data, also mention the Kaggle mirror we used.
 
 ---
 
@@ -72,21 +72,52 @@ Checked on 2026-11-11. Sizes are what the script downloaded on that date.
   - `all_matches.csv`: all deliveries in one file.
   - `README.txt`, `LICENSE.txt`.
 
-## 3. Crop production (data.gov.in)
+## 3. Crop production (Kaggle mirror of data.gov.in)
 
-- **Official source:** "District-wise, season-wise crop production statistics from
+### Copy in use: Kaggle mirror (downloaded manually, 2026-11-11)
+
+- **Source used:** https://www.kaggle.com/datasets/abhinand05/crop-production-in-india
+  ("Crop Production in India" by Abhinand, last updated 2019-11-12). Downloaded by
+  hand from Kaggle and saved as `data/raw/crop_production/crop_production.csv`.
+  `scripts/download_datasets.py crop` skips it because the file already exists.
+- **Licence on the mirror:** Kaggle lists "Other (specified in description)", but
+  the description does not name any licence.
+- **Licence of the underlying data:** the rows are the data.gov.in "District-wise,
+  season-wise crop production statistics" (see below), published under the
+  **Government Open Data License - India (GODL-India)**. GODL allows use and
+  adaptation with attribution, so we credit data.gov.in / Ministry of Agriculture and
+  Farmers Welfare as the source and mention the Kaggle mirror.
+- **Provenance caveat:** the mirror says its content was "taken from data.world"
+  (`data.world/thatzprem/agriculture-india`), not directly from data.gov.in. That
+  data.world page has since been retired, so this middle step can't be verified.
+  Treat the mirror as an unofficial copy of the official dataset.
+- **File:** `crop_production.csv`, 15.3 MB (15,316,741 bytes, same size as listed
+  on Kaggle), 246,091 rows.
+- **Columns:** `State_Name`, `District_Name`, `Crop_Year`, `Season`, `Crop`,
+  `Area`, `Production`. The file has no units; the official series reports area in
+  hectares and production in tonnes. Check units per crop during EDA before
+  comparing crops with each other.
+- **Coverage:** crop years 1997 to 2015; 33 states/UTs, 646 districts, 124 crops,
+  6 seasons.
+- **Known gaps:** `Production` is missing in 3,730 rows (1.5%). Coverage stops at
+  2015, while the official data.gov.in series has later years.
+- **Granularity:** district-level, with the state on every row, so state-wise
+  production is a `GROUP BY` over the same file.
+
+### Official source (for a later refresh)
+
+- **Official dataset:** "District-wise, season-wise crop production statistics from
   1997", Ministry of Agriculture and Farmers Welfare, on the Open Government Data
   Platform India:
   https://data.gov.in/resource/district-wise-season-wise-crop-production-statistics-1997
   (catalog: https://www.data.gov.in/catalog/district-wise-season-wise-crop-production-statistics-0).
 - **Licence:** Government Open Data License - India (GODL-India), as stated on the
   resource page.
-- **Granularity:** district-level, with the state on every row, so state-wise
-  production is a `GROUP BY` over the same file.
 - **API resource ID:** `35be999b-0208-4354-b557-f6ca9a5355de`
   (`https://api.data.gov.in/resource/<id>`).
 - **Needs a free API key.** The API rejects requests without a key, and the public
-  demo key in data.gov.in's docs is shared and rate-limited. Steps:
+  demo key in data.gov.in's docs is shared and rate-limited. To replace the mirror
+  with the official data later, delete the mirror file (or pass `--force`), then:
   1. Register or sign in at https://data.gov.in (top right: Login, then Sign up).
   2. Open **My Account** in the profile menu and generate an API key.
   3. Add it to `.env`: `DATA_GOV_IN_API_KEY=<your key>` (placeholder is in `.env.example`).
@@ -96,7 +127,8 @@ Checked on 2026-11-11. Sizes are what the script downloaded on that date.
   **Alternative without the API:** on the resource page click **Download**, choose
   CSV, fill in the short usage form, and save the file as
   `data/raw/crop_production/crop_production.csv`.
-- **Files, size, rows, fields:** to be filled in after the first download.
+  Check that the column names match the mirror's before switching, since the
+  official export may name them differently.
 
 ## 4. F1 World Championship (Jolpica-F1)
 
