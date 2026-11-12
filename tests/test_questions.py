@@ -73,9 +73,9 @@ def test_train_examples_only_returns_train(tmp_path):
     for name in qs.SET_FILES:
         qs.write_jsonl(tmp_path / qs.SET_FILES[name], [dict(r, id=f"{name}-{r['id']}") for r in rows])
     pool = qs.train_examples(questions_dir=tmp_path)
-    assert {r["split"] for r in pool} == {"train"} and len(pool) == 6
-    assert [r["id"] for r in qs.train_examples("f1", questions_dir=tmp_path)] == [
-        "csv-c", "hinglish-c", "unanswerable-c"]
+    assert {r["split"] for r in pool} == {"train"} and len(pool) == 2 * len(qs.SET_FILES)
+    assert sorted(r["id"] for r in qs.train_examples("f1", questions_dir=tmp_path)) == sorted(
+        f"{name}-c" for name in qs.SET_FILES)
 
 
 def test_real_question_files_never_leak_test_into_training_pool():

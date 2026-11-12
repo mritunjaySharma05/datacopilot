@@ -13,7 +13,7 @@ spec = importlib.util.spec_from_file_location("build_questions", SCRIPT)
 bq = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bq)
 
-N_CSV, N_HI = 10, 5  # per dataset in the fake sets
+N_CSV, N_HI, N_HI_UN = 10, 5, 5  # per dataset in the fake sets
 GOOD_SQL = {
     "olist": "SELECT COUNT(*) FROM orders WHERE amount > {k}",
     "ipl": "SELECT COUNT(*) FROM ipl_matches WHERE runs > {k}",
@@ -38,7 +38,7 @@ def processed(tmp_path):
 def write_sets(qdir: Path) -> None:
     """Small sets with the same shape as the real ones (authored fields only)."""
     base = {"olist": 0, "ipl": 100, "f1": 2000, "crop": 1990}
-    csv, un, hi = [], [], []
+    csv, un, hi, hi_un = [], [], [], []
     for ds, sql in GOOD_SQL.items():
         for i in range(N_CSV):
             csv.append({"id": f"{ds}-{i:03d}", "dataset": ds, "question": f"{ds} count above {i}?",
@@ -50,14 +50,20 @@ def write_sets(qdir: Path) -> None:
         for i in range(N_HI):
             hi.append({"id": f"{ds}-{i:03d}-hi", "dataset": ds, "question": f"{ds} mein {i} se zyada kitne?",
                        "source_id": f"{ds}-{i:03d}"})
+        for j in range(N_HI_UN):  # one of each unanswerable type per dataset
+            hi_un.append({"id": f"{ds}-u{j:03d}-hi", "dataset": ds, "question": f"{ds} ka sawaal {j}?",
+                          "source_id": f"{ds}-u{j:03d}"})
     write_jsonl(qdir / SET_FILES["csv"], csv)
     write_jsonl(qdir / SET_FILES["unanswerable"], un)
     write_jsonl(qdir / SET_FILES["hinglish"], hi)
+    write_jsonl(qdir / SET_FILES["hinglish_unanswerable"], hi_un)
 
 
 @pytest.fixture
 def built(tmp_path, processed, monkeypatch):
-    monkeypatch.setattr(bq, "EXPECTED_PER_DATASET", {"csv": N_CSV, "hinglish": N_HI, "unanswerable": 10})
+    monkeypatch.setattr(bq, "EXPECTED_PER_DATASET", {"csv": N_CSV, "hinglish": N_HI, "unanswerable": 10,
+                                                     "hinglish_unanswerable": (N_HI_UN, N_HI_UN)})
+    monkeypatch.setattr(bq, "EXPECTED_TOTAL", {"hinglish_unanswerable": 4 * N_HI_UN})
     monkeypatch.setattr(bq, "SPLIT_TOLERANCE", 1.0)  # tiny groups can't hit 70/30 exactly
     qdir = tmp_path / "questions"
     qdir.mkdir()
@@ -77,6 +83,12 @@ def test_build_fills_answers_splits_and_hinglish(built, processed):
         src = english[row["source_id"]]
         assert (row["gold_sql"], row["gold_answer"], row["split"], row["difficulty"]) == (
             src["gold_sql"], src["gold_answer"], src["split"], src["difficulty"])
+    un_src = {r["id"]: r for r in un}
+    for row in read_jsonl(built / SET_FILES["hinglish_unanswerable"]):
+        src = un_src[row["source_id"]]
+        assert row["answerable"] is False and row["gold_sql"] is None
+        assert (row["unanswerable_type"], row["split"], row["difficulty"]) == (
+            src["unanswerable_type"], src["split"], src["difficulty"])
     assert bq.check(built, processed) == []
 
 
@@ -113,6 +125,10 @@ def _edit(qdir, name, fn):
     ("unanswerable", lambda rows: rows[0].update(unanswerable_type="subjective"), "not balanced"),
     ("unanswerable", lambda rows: rows[0].update(gold_sql="SELECT 1"), "must have null gold_sql"),
     ("unanswerable", lambda rows: rows.pop(), "has 9 rows"),
+    ("hinglish_unanswerable", lambda rows: rows[0].update(unanswerable_type="subjective"), "differ from"),
+    ("hinglish_unanswerable", lambda rows: rows[0].update(source_id="nope"), "not found"),
+    ("hinglish_unanswerable", lambda rows: rows.pop(), "types not balanced"),
+    ("hinglish_unanswerable", lambda rows: rows[0].update(answerable=True), "answerable != False"),
 ])
 def test_check_catches_problems(built, processed, name, mutate, expected):
     _edit(built, name, mutate)

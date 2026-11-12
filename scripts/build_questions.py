@@ -29,7 +29,12 @@ from datacopilot.questions import (  # noqa: E402
 )
 
 # Expected rows per dataset in each file.
-EXPECTED_PER_DATASET = {"csv": 50, "hinglish": 25, "unanswerable": 50}
+# An int means exactly that many; a (min, max) tuple allows a small spread across datasets.
+EXPECTED_PER_DATASET = {"csv": 50, "hinglish": 25, "unanswerable": 50, "hinglish_unanswerable": (12, 13)}
+EXPECTED_TOTAL = {"hinglish_unanswerable": 50}
+# Each Hinglish set is a translation of this source set.
+HINGLISH_SOURCE = {"hinglish": "csv", "hinglish_unanswerable": "unanswerable"}
+ANSWERABLE_SETS = {"csv", "hinglish"}
 SPLIT_TOLERANCE = 0.05  # allowed deviation of each dataset's test share from TEST_SHARE
 
 
@@ -80,22 +85,23 @@ def with_splits(rows: list[dict]) -> list[dict]:
     return [{**row, "split": splits[row["id"]]} for row in rows]
 
 
-def build_hinglish(rows: list[dict], english: dict[str, dict]) -> tuple[list[dict], list[str]]:
-    """Copy gold fields and split from each Hinglish row's English source."""
+INHERITED = ("dataset", "gold_sql", "gold_answer", "answerable", "unanswerable_type", "difficulty", "split")
+
+
+def build_hinglish(rows: list[dict], sources: dict[str, dict]) -> tuple[list[dict], list[str]]:
+    """Copy dataset, gold fields, label, difficulty and split from each row's English source."""
     kept, dropped = [], []
     for row in rows:
-        src = english.get(row.get("source_id"))
+        src = sources.get(row.get("source_id"))
         if src is None:
-            dropped.append(f"{row['id']}: source {row.get('source_id')} not in csv_questions")
+            dropped.append(f"{row['id']}: source {row.get('source_id')} not found")
             continue
-        kept.append({**row, "dataset": src["dataset"], "gold_sql": src["gold_sql"], "gold_answer": src["gold_answer"],
-                     "answerable": True, "unanswerable_type": None, "difficulty": src["difficulty"],
-                     "split": src["split"]})
+        kept.append({**row, **{k: src[k] for k in INHERITED}})
     return kept, dropped
 
 
 def build(questions_dir: Path, processed_dir: Path) -> list[str]:
-    """Rebuild all three files in place; return messages about dropped rows."""
+    """Rebuild all question files in place; return messages about dropped rows."""
     conns = Connections(processed_dir)
     messages = []
     csv_rows, dropped = build_answerable(read_jsonl(questions_dir / SET_FILES["csv"]), conns)
@@ -106,11 +112,13 @@ def build(questions_dir: Path, processed_dir: Path) -> list[str]:
     un_rows = with_splits(build_unanswerable(read_jsonl(questions_dir / SET_FILES["unanswerable"])))
     write_jsonl(questions_dir / SET_FILES["unanswerable"], un_rows)
 
-    hi_path = questions_dir / SET_FILES["hinglish"]
-    if hi_path.exists():
-        hi_rows, dropped = build_hinglish(read_jsonl(hi_path), {r["id"]: r for r in csv_rows})
-        messages += dropped
-        write_jsonl(hi_path, hi_rows)
+    sources = {"csv": {r["id"]: r for r in csv_rows}, "unanswerable": {r["id"]: r for r in un_rows}}
+    for name, source in HINGLISH_SOURCE.items():
+        path = questions_dir / SET_FILES[name]
+        if path.exists():
+            hi_rows, dropped = build_hinglish(read_jsonl(path), sources[source])
+            messages += dropped
+            write_jsonl(path, hi_rows)
     return messages
 
 
@@ -119,7 +127,7 @@ def build(questions_dir: Path, processed_dir: Path) -> list[str]:
 def check_schema(name: str, rows: list[dict]) -> list[str]:
     """Fields, types and allowed values for one file."""
     problems = []
-    required = set(FIELDS) | ({"source_id"} if name == "hinglish" else set())
+    required = set(FIELDS) | ({"source_id"} if name in HINGLISH_SOURCE else set())
     for row in rows:
         rid = row.get("id", "?")
         missing = required - set(row)
@@ -146,7 +154,7 @@ def check_schema(name: str, rows: list[dict]) -> list[str]:
                 problems.append(f"{name}/{rid}: unanswerable rows must have null gold_sql / gold_answer")
         else:
             problems.append(f"{name}/{rid}: answerable must be true/false")
-    expected_answerable = name != "unanswerable"
+    expected_answerable = name in ANSWERABLE_SETS
     wrong = [r["id"] for r in rows if r.get("answerable") is not expected_answerable]
     if wrong:
         problems.append(f"{name}: rows with answerable != {expected_answerable}: {wrong[:5]}")
@@ -154,12 +162,20 @@ def check_schema(name: str, rows: list[dict]) -> list[str]:
 
 
 def check_counts(name: str, rows: list[dict]) -> list[str]:
-    """Expected rows per dataset; unanswerable types balanced within each dataset."""
+    """Expected rows per dataset; unanswerable types balanced (per dataset, or overall for Hinglish)."""
     problems = []
     per_ds = Counter(r["dataset"] for r in rows)
+    expected = EXPECTED_PER_DATASET[name]
+    lo, hi = expected if isinstance(expected, tuple) else (expected, expected)
     for ds in DATASETS:
-        if per_ds[ds] != EXPECTED_PER_DATASET[name]:
-            problems.append(f"{name}: {ds} has {per_ds[ds]} rows, expected {EXPECTED_PER_DATASET[name]}")
+        if not lo <= per_ds[ds] <= hi:
+            problems.append(f"{name}: {ds} has {per_ds[ds]} rows, expected {expected}")
+    if name in EXPECTED_TOTAL and len(rows) != EXPECTED_TOTAL[name]:
+        problems.append(f"{name}: {len(rows)} rows, expected {EXPECTED_TOTAL[name]}")
+    if name == "hinglish_unanswerable":
+        types = Counter(r["unanswerable_type"] for r in rows)
+        if len(set(types.values())) > 1 or set(types) != set(UNANSWERABLE_TYPES):
+            problems.append(f"hinglish_unanswerable: types not balanced: {dict(types)}")
     if name == "unanswerable":
         for ds in DATASETS:
             types = Counter(r["unanswerable_type"] for r in rows if r["dataset"] == ds)
@@ -168,18 +184,21 @@ def check_counts(name: str, rows: list[dict]) -> list[str]:
     return problems
 
 
-def check_splits(name: str, rows: list[dict], english: dict[str, dict]) -> list[str]:
-    """Splits follow the seeded assignment (Hinglish: the English source's split), ~70/30."""
+def check_splits(name: str, rows: list[dict], sources: dict[str, dict]) -> list[str]:
+    """Splits follow the seeded assignment (Hinglish: the source row's split), ~70/30.
+
+    `sources` maps id -> row of the set this Hinglish set was translated from.
+    """
     problems = []
-    if name == "hinglish":
+    if name in HINGLISH_SOURCE:
         for r in rows:
-            src = english.get(r["source_id"])
+            src = sources.get(r["source_id"])
             if src is None:
-                problems.append(f"hinglish/{r['id']}: source_id {r['source_id']} not found")
-            elif (r["split"], r["gold_sql"], r["gold_answer"]) != (src["split"], src["gold_sql"], src["gold_answer"]):
-                problems.append(f"hinglish/{r['id']}: split/gold_sql/gold_answer differ from {src['id']}")
+                problems.append(f"{name}/{r['id']}: source_id {r['source_id']} not found")
+            elif any(r[k] != src[k] for k in INHERITED):
+                problems.append(f"{name}/{r['id']}: split/gold/label/difficulty differ from {src['id']}")
             elif norm_question(r["question"]) == norm_question(src["question"]):
-                problems.append(f"hinglish/{r['id']}: question identical to the English original")
+                problems.append(f"{name}/{r['id']}: question identical to the English original")
     else:
         expected = assign_splits(rows)
         changed = [r["id"] for r in rows if r["split"] != expected[r["id"]]]
@@ -222,14 +241,15 @@ def check_answers(rows: list[dict], conns: Connections) -> list[str]:
 def check(questions_dir: Path, processed_dir: Path, run_sql: bool = True) -> list[str]:
     """Validate all files; return a list of problems (empty = valid)."""
     rows = {name: read_jsonl(questions_dir / f) for name, f in SET_FILES.items()}
-    english = {r["id"]: r for r in rows["csv"]}
+    by_id = {name: {r["id"]: r for r in file_rows} for name, file_rows in rows.items()}
     problems, schema_ok = [], {}
     for name, file_rows in rows.items():
         schema = check_schema(name, file_rows)
         schema_ok[name] = not schema
         problems += schema
         if not schema:
-            problems += check_counts(name, file_rows) + check_splits(name, file_rows, english)
+            sources = by_id[HINGLISH_SOURCE[name]] if name in HINGLISH_SOURCE else {}
+            problems += check_counts(name, file_rows) + check_splits(name, file_rows, sources)
     problems += check_duplicates(rows)
     # Re-run gold SQL whenever the English rows are well-formed, even if other checks failed,
     # so a wrong stored answer is always reported.

@@ -1,7 +1,7 @@
 """Evaluation question sets: execute gold SQL, normalize answers, assign splits, load safely.
 
 Question rows (JSONL) have: id, dataset, question, gold_sql, gold_answer, answerable,
-unanswerable_type, difficulty, split. Hinglish rows also have source_id (the English id).
+unanswerable_type, difficulty, split. Rows of both Hinglish sets also have source_id.
 
 Test questions must never be used for prompt examples or training: use
 `train_examples()`, which only ever returns train-split rows.
@@ -28,6 +28,7 @@ SET_FILES = {
     "csv": "csv_questions.jsonl",
     "hinglish": "hinglish_questions.jsonl",
     "unanswerable": "unanswerable_questions.jsonl",
+    "hinglish_unanswerable": "hinglish_unanswerable.jsonl",
 }
 DIFFICULTIES = ("easy", "medium", "hard")
 UNANSWERABLE_TYPES = ("missing_column", "out_of_range", "external_knowledge", "subjective", "write_request")
