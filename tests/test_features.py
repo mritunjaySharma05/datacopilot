@@ -93,13 +93,26 @@ def test_unknown_entity():
 def test_write_request_signals():
     out = f("Drop the crop production table.")
     assert out["has_write_verb"] == out["starts_with_write_verb"] == out["mentions_table_word"] == 1
-    assert out["qtype_imperative"] == 1 and out["ends_with_question_mark"] == 0
+    assert out["qtype_imperative"] == 1
 
 
 def test_opinion_and_external_cues():
     assert f("Which crop is the best for farmers to grow?")["n_opinion_words"] == 1
     assert f("Who is India's agriculture minister?")["n_external_cues"] >= 1
     assert f("What is the population of Uttar Pradesh?")["n_external_cues"] == 1
+
+
+def test_no_punctuation_feature():
+    assert "ends_with_question_mark" not in ft.FEATURE_NAMES  # removed: a writing-style artifact
+
+
+def test_hinglish_write_opinion_and_external_cues():
+    write = f("2012 ki saari rice rows delete kar do.")
+    assert write["has_write_verb"] == 1 and write["qtype_imperative"] == 1
+    assert f("Saari wides hata do.")["qtype_imperative"] == 1
+    assert f("Kis state ke kisan sabse achhe hain?")["n_opinion_words"] >= 1
+    assert f("India ke agriculture mantri kaun hain?")["n_external_cues"] == 1
+    assert f("MS Dhoni kahan paida hue the?")["n_external_cues"] == 1
 
 
 def test_hinglish_share():

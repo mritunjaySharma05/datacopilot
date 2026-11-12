@@ -57,6 +57,7 @@ OPINION_WORDS = frozenset("""
 best worst greatest good bad better worse beautiful nicest coolest interesting exciting boring
 overrated underrated fair unfair trustworthy loyal dramatic stylish favourite favorite promising
 important healthier healthy should ought recommend worth happy happier
+achha accha acha achhe achhi acche acchi behtar bura bure mahaan pasand chahiye mazedaar
 """.split())
 
 # Phrases that point to facts outside any table (ownership, people's roles, "now", the world).
@@ -66,6 +67,8 @@ EXTERNAL_CUES = (
     "inflation", "gdp", "market share", "brand value", "prize money", "social media", "followers",
     "broadcast", "tv", "sponsor", "regulation", "government", "scheme", "designed", "usually",
     "ticket", "salary", "cost to build",
+    # Hinglish: owner, born, population, minister, capital
+    "malik", "paida", "aabadi", "jansankhya", "mantri", "rajdhani",
 )
 
 # Roman-script Hindi function words (none of them are also common English words).
@@ -74,6 +77,10 @@ kitne kitna kitni kaun kaunsa kaunsi kis kise kisne kya kab kahan mein hai hain 
 zyada jyada kam wale wali wala aur saal har ne ko ka ki ke se gaya gayi gaye hue hua bataye batao
 abhi bhi jo unme jinke jin liye karne karke chhod tak beech pehle baad
 """.split())
+
+# Hinglish imperatives ("delete kar do", "hata do") mark a request to change data.
+HINGLISH_IMPERATIVE_RE = re.compile(
+    r"\b(kar do|kar dijiye|kar dena|karo|hata do|hatao|mita do|badal do|daal do|bana do|jod do|khali kar)\b")
 
 YEAR_RE = re.compile(r"\b(1[89]\d{2}|20\d{2})\b(?![,.]\d)")
 YEAR_WITH_NEXT_RE = re.compile(r"\b(1[89]\d{2}|20\d{2})\b(?![,.]\d)\s*([A-Za-z]*)")
@@ -89,7 +96,6 @@ FEATURE_NAMES = (
     "n_opinion_words", "n_external_cues", "n_years", "year_out_of_range", "years_outside_by",
     "n_numbers", "n_entities", "n_unmatched_entities", "qtype_how_many", "qtype_which_what",
     "qtype_who", "qtype_when_where", "qtype_yes_no", "qtype_imperative", "hinglish_share",
-    "ends_with_question_mark",
 )
 
 
@@ -222,7 +228,8 @@ def question_type(question: str) -> dict[str, int]:
         "qtype_who": bool(re.search(r"^\s*who\b|\bwho (is|was|are|won|scored|owns|set|led)\b", q)),
         "qtype_when_where": bool(re.search(r"^\s*(when|where|on what date|in which year)\b|\b(kab|kahan)\b", q)),
         "qtype_yes_no": first in {"is", "are", "was", "were", "do", "does", "did", "should", "can", "could", "would"},
-        "qtype_imperative": first in WRITE_VERBS | {"list", "show", "give", "find", "tell", "get"},
+        "qtype_imperative": first in WRITE_VERBS | {"list", "show", "give", "find", "tell", "get"}
+        or bool(HINGLISH_IMPERATIVE_RE.search(q)),
     }
     types["qtype_which_what"] = not any(types.values()) and bool(
         re.search(r"\b(which|what|kaun|kaunsa|kaunsi|kis|kya)\b", q))
@@ -278,6 +285,5 @@ def extract_features(question: str, schema: dict[str, list[dict]],
         "n_unmatched_entities": len(unmatched_ents),
         **question_type(question),
         "hinglish_share": sum(w in HINGLISH_MARKERS for w in words) / n_words if n_words else 0.0,
-        "ends_with_question_mark": int(question.strip().endswith("?")),
     }
     return {name: float(features[name]) for name in FEATURE_NAMES}
