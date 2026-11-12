@@ -8,12 +8,13 @@ Our own question sets for evaluating DataCopilot on the four Module 3 datasets
 | `csv_questions.jsonl` | 200 | 50 answerable questions per dataset (easy / medium / hard) |
 | `hinglish_questions.jsonl` | 100 | Hinglish versions of 25 English questions per dataset |
 | `unanswerable_questions.jsonl` | 200 | 50 per dataset, 10 of each unanswerable type |
+| `hinglish_unanswerable.jsonl` | 50 | Hinglish versions of 50 unanswerable questions (12-13 per dataset, 10 per type) |
 
 ## Row format (one JSON object per line)
 
 | Field | Meaning |
 |---|---|
-| `id` | `olist-001` (English), `olist-001-hi` (Hinglish), `olist-u001` (unanswerable) |
+| `id` | `olist-001` (English), `olist-001-hi` (Hinglish), `olist-u001` (unanswerable), `olist-u001-hi` (Hinglish unanswerable) |
 | `dataset` | `olist`, `ipl`, `f1` or `crop` |
 | `question` | The natural-language question |
 | `gold_sql` | Reference SQL (`null` if unanswerable). Olist: SQLite dialect on `data/processed/olist.sqlite`. Others: DuckDB on the processed CSVs (table = file name, e.g. `ipl_matches`) |
@@ -22,7 +23,7 @@ Our own question sets for evaluating DataCopilot on the four Module 3 datasets
 | `unanswerable_type` | `missing_column`, `out_of_range`, `external_knowledge`, `subjective`, `write_request`, or `null` |
 | `difficulty` | `easy` / `medium` / `hard` (see below) |
 | `split` | `train` / `test` |
-| `source_id` | Hinglish only: id of the English original |
+| `source_id` | Hinglish sets only: id of the English original |
 
 **Difficulty.** Answerable: easy = single filter / count, medium = group by / order /
 aggregate, hard = joins (Olist), subqueries, window functions, multi-step logic.
@@ -33,8 +34,9 @@ to see that a year or entity is absent).
 ## Splits: test questions are off limits
 
 70% train / 30% test, stratified by dataset, answerable and unanswerable type, seed 42
-(`datacopilot.questions.assign_splits`). Each Hinglish row inherits the split of its
-English original, so the same gold SQL never appears in both splits.
+(`datacopilot.questions.assign_splits`). Each Hinglish row (both Hinglish sets) inherits
+the split, label, type and difficulty of its English original, so a question and its
+translation never end up on different sides of the split.
 
 **Never use test questions for prompt examples, few-shot selection, fine-tuning or
 classifier training.** Load examples with `datacopilot.questions.train_examples()`,
