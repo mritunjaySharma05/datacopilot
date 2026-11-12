@@ -1,7 +1,7 @@
-"""Build answerability features for every question in csv_questions + unanswerable_questions.
+"""Build answerability features for every question in the English and Hinglish question sets.
 
 Output: data/features/answerability_features.csv, one row per question:
-    id, dataset, split, answerable, unanswerable_type   <- metadata / label (do not train on)
+    id, dataset, question_set, split, answerable, unanswerable_type   <- metadata / label (do not train on)
     <FEATURE_NAMES ...>                                  <- model inputs
 
 The classifier is trained in Module 4 on split == "train" rows only; test rows are kept
@@ -24,8 +24,8 @@ from datacopilot.pipeline.profiler import get_schema, get_sqlite_schema  # noqa:
 from datacopilot.questions import PROCESSED_DIR, QUESTIONS_DIR, connect, load_question_set  # noqa: E402
 
 OUT_PATH = ROOT / "data" / "features" / "answerability_features.csv"
-META_COLUMNS = ("id", "dataset", "split", "answerable", "unanswerable_type")
-SOURCE_SETS = ("csv", "unanswerable")
+META_COLUMNS = ("id", "dataset", "question_set", "split", "answerable", "unanswerable_type")
+SOURCE_SETS = ("csv", "unanswerable", "hinglish", "hinglish_unanswerable")
 
 
 def dataset_inputs(dataset: str, processed_dir: Path = PROCESSED_DIR) -> tuple[dict, object]:
@@ -40,8 +40,9 @@ def build_feature_table(questions: list[dict], inputs: dict[str, tuple[dict, obj
     rows = []
     for q in questions:
         schema, context = inputs[q["dataset"]]
-        rows.append({"id": q["id"], "dataset": q["dataset"], "split": q["split"],
-                     "answerable": int(q["answerable"]), "unanswerable_type": q["unanswerable_type"],
+        rows.append({"id": q["id"], "dataset": q["dataset"], "question_set": q.get("question_set", ""),
+                     "split": q["split"], "answerable": int(q["answerable"]),
+                     "unanswerable_type": q["unanswerable_type"],
                      **extract_features(q["question"], schema, context)})
     return pd.DataFrame(rows, columns=[*META_COLUMNS, *FEATURE_NAMES])
 
@@ -63,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     args = parser.parse_args(argv)
 
-    questions = [q for name in SOURCE_SETS for q in load_question_set(name, questions_dir=args.questions_dir)]
+    questions = [{**q, "question_set": name} for name in SOURCE_SETS
+                 for q in load_question_set(name, questions_dir=args.questions_dir)]
     inputs = {ds: dataset_inputs(ds, args.processed_dir) for ds in sorted({q["dataset"] for q in questions})}
     table = build_feature_table(questions, inputs)
     args.out.parent.mkdir(parents=True, exist_ok=True)
