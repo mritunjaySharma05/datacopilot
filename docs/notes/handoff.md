@@ -69,8 +69,8 @@ blindly rebuild answers: diff first, then decide.
 |---|---|
 | 1. Proposal, charter, architecture, repo setup | Submitted |
 | 2. Research, design, basic prototype | Submitted |
-| 3. Data collection, cleaning, EDA, question sets, features | Report committed 2026-11-12 (`docs/reports/DataCopilot_Module3_Submission.pdf`). `docs/planning/milestones.md` still says "In progress": update it |
-| 4. Answerability classifier + baseline vs validated experiments | **Next.** Features ready, nothing trained yet |
+| 3. Data collection, cleaning, EDA, question sets, features | Submitted (report: `docs/reports/DataCopilot_Module3_Submission.pdf`, committed 2026-11-12) |
+| 4. Answerability classifier + baseline vs validated experiments | **In progress.** Features ready, nothing trained yet |
 | 5-8 | Not started |
 
 ### What exists (by area)
@@ -201,8 +201,8 @@ blindly rebuild answers: diff first, then decide.
 1. **Hinglish class balance:** add ~50 more Hinglish unanswerable questions (to 100) so
    `hinglish_share` doesn't leak the label? Or reweight in training.
 2. **`n_words` in the model:** keep, drop, or report an ablation (train with and without).
-3. **Module 3 status in `docs/planning/milestones.md`:** mark "Submitted" and Module 4
-   "In progress" once confirmed.
+3. ~~Module 3 status in `docs/planning/milestones.md`~~ Resolved 2026-11-15: Module 3
+   "Submitted", Module 4 "In progress".
 4. **BIRD scale for Module 4 experiments:** full 1,534 dev questions takes hours on a 7B
    local model; pick a stratified subset size (e.g. 200-300) and whether to also run the
    cleaned 20251106 split.
