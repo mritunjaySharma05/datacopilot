@@ -22,7 +22,7 @@ Then set up the environment:
 git clone https://github.com/mritunjaySharma05/datacopilot.git && cd datacopilot
 python3 -m venv .venv && source .venv/bin/activate      # Python 3.11+ (3.13 used so far)
 brew install libomp                                      # xgboost on Apple Silicon needs it
-pip install -r requirements.txt                          # versions are NOT pinned yet
+pip install -r requirements.txt                          # top-level versions pinned
 cp .env.example .env                                     # then fill DATA_GOV_IN_API_KEY only if needed
 ```
 
@@ -166,7 +166,8 @@ blindly rebuild answers: diff first, then decide.
 - IPL: 25 matches without a winner; 23 D/L-affected matches.
 
 **Code / tooling caveats**
-- `requirements.txt` is unpinned: pin versions before Module 5 (Docker).
+- `requirements.txt` pins top-level packages only (2026-11-15); transitive dependencies
+  are not locked, so a fresh install may differ slightly between machines.
 - `prepare_data.py <one dataset>` overwrites `docs/data_quality/cleaning_log.md` with only
   that dataset's steps; run it with no arguments for the full log.
 - Question-feature caveats: `n_words` may be a writing-style artifact (unanswerable
@@ -206,7 +207,8 @@ blindly rebuild answers: diff first, then decide.
 4. **BIRD scale for Module 4 experiments:** full 1,534 dev questions takes hours on a 7B
    local model; pick a stratified subset size (e.g. 200-300) and whether to also run the
    cleaned 20251106 split.
-5. **Pin dependencies now or at Module 5.**
+5. ~~Pin dependencies now or at Module 5.~~ Resolved 2026-11-15: top-level packages
+   pinned in `requirements.txt` to the versions installed on the Windows machine.
 6. **SQLAlchemy for SQLite/PostgreSQL** (CLAUDE.md names it) vs keeping stdlib `sqlite3`.
 
 ---
