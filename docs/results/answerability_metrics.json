@@ -1,0 +1,389 @@
+{
+  "main": {
+    "features": [
+      "n_words",
+      "n_content_words",
+      "schema_overlap",
+      "value_overlap",
+      "unmatched_content_words",
+      "unmatched_share",
+      "has_write_verb",
+      "starts_with_write_verb",
+      "mentions_table_word",
+      "n_opinion_words",
+      "n_external_cues",
+      "n_years",
+      "year_out_of_range",
+      "years_outside_by",
+      "n_numbers",
+      "n_entities",
+      "n_unmatched_entities",
+      "qtype_how_many",
+      "qtype_which_what",
+      "qtype_who",
+      "qtype_when_where",
+      "qtype_yes_no",
+      "qtype_imperative",
+      "hinglish_share"
+    ],
+    "n_train": 420,
+    "best": {
+      "model": "logreg",
+      "params": {
+        "clf__C": 0.1
+      },
+      "cv_macro_f1": 0.8903,
+      "cv_std": 0.0348
+    },
+    "per_family": {
+      "logreg": {
+        "params": {
+          "clf__C": 0.1
+        },
+        "cv_macro_f1": 0.8903,
+        "cv_std": 0.0348,
+        "test_macro_f1": 0.9056
+      },
+      "random_forest": {
+        "params": {
+          "max_depth": null,
+          "min_samples_leaf": 5
+        },
+        "cv_macro_f1": 0.8833,
+        "cv_std": 0.0332,
+        "test_macro_f1": 0.9166
+      },
+      "xgboost": {
+        "params": {
+          "learning_rate": 0.1,
+          "max_depth": 2,
+          "n_estimators": 100
+        },
+        "cv_macro_f1": 0.8761,
+        "cv_std": 0.0268,
+        "test_macro_f1": 0.8833
+      }
+    },
+    "test": {
+      "n": 180,
+      "accuracy": 0.9055555555555556,
+      "macro_f1": 0.9055526405135961,
+      "unanswerable_precision": 0.9010989010989011,
+      "unanswerable_recall": 0.9111111111111111,
+      "unanswerable_f1": 0.9060773480662984,
+      "confusion_matrix": [
+        [
+          82,
+          8
+        ],
+        [
+          9,
+          81
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "csv": 0.9167,
+        "hinglish": 0.8667,
+        "hinglish_unanswerable": 0.9333,
+        "unanswerable": 0.9
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.9556,
+        "f1": 0.9565,
+        "ipl": 0.7955,
+        "olist": 0.9111
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.9412,
+        "missing_column": 0.7,
+        "out_of_range": 0.9412,
+        "subjective": 1.0,
+        "write_request": 1.0
+      }
+    },
+    "weights": {
+      "n_words": 0.9991,
+      "n_opinion_words": -0.6714,
+      "n_external_cues": -0.5776,
+      "year_out_of_range": -0.5404,
+      "n_numbers": 0.5366,
+      "qtype_imperative": -0.4849,
+      "n_unmatched_entities": -0.4832,
+      "schema_overlap": 0.4065,
+      "unmatched_share": -0.3643,
+      "unmatched_content_words": -0.3229,
+      "years_outside_by": -0.2914,
+      "has_write_verb": -0.2867,
+      "qtype_which_what": 0.2506,
+      "starts_with_write_verb": -0.2382,
+      "qtype_yes_no": -0.2148,
+      "n_years": 0.2112,
+      "value_overlap": -0.1855,
+      "qtype_how_many": 0.1733,
+      "n_content_words": 0.1595,
+      "qtype_who": 0.1391,
+      "hinglish_share": 0.1042,
+      "mentions_table_word": -0.0798,
+      "n_entities": 0.0511,
+      "qtype_when_where": 0.0398
+    }
+  },
+  "no_n_words": {
+    "features": [
+      "n_content_words",
+      "schema_overlap",
+      "value_overlap",
+      "unmatched_content_words",
+      "unmatched_share",
+      "has_write_verb",
+      "starts_with_write_verb",
+      "mentions_table_word",
+      "n_opinion_words",
+      "n_external_cues",
+      "n_years",
+      "year_out_of_range",
+      "years_outside_by",
+      "n_numbers",
+      "n_entities",
+      "n_unmatched_entities",
+      "qtype_how_many",
+      "qtype_which_what",
+      "qtype_who",
+      "qtype_when_where",
+      "qtype_yes_no",
+      "qtype_imperative",
+      "hinglish_share"
+    ],
+    "n_train": 420,
+    "best": {
+      "model": "xgboost",
+      "params": {
+        "learning_rate": 0.05,
+        "max_depth": 5,
+        "n_estimators": 300
+      },
+      "cv_macro_f1": 0.8856,
+      "cv_std": 0.0325
+    },
+    "per_family": {
+      "xgboost": {
+        "params": {
+          "learning_rate": 0.05,
+          "max_depth": 5,
+          "n_estimators": 300
+        },
+        "cv_macro_f1": 0.8856,
+        "cv_std": 0.0325,
+        "test_macro_f1": 0.8722
+      },
+      "random_forest": {
+        "params": {
+          "max_depth": 10,
+          "min_samples_leaf": 1
+        },
+        "cv_macro_f1": 0.8808,
+        "cv_std": 0.0476,
+        "test_macro_f1": 0.8999
+      },
+      "logreg": {
+        "params": {
+          "clf__C": 0.1
+        },
+        "cv_macro_f1": 0.8688,
+        "cv_std": 0.0505,
+        "test_macro_f1": 0.9
+      }
+    },
+    "test": {
+      "n": 180,
+      "accuracy": 0.8722222222222222,
+      "macro_f1": 0.8722182783419241,
+      "unanswerable_precision": 0.8681318681318682,
+      "unanswerable_recall": 0.8777777777777778,
+      "unanswerable_f1": 0.8729281767955801,
+      "confusion_matrix": [
+        [
+          79,
+          11
+        ],
+        [
+          12,
+          78
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "csv": 0.9,
+        "hinglish": 0.8,
+        "hinglish_unanswerable": 0.9,
+        "unanswerable": 0.8667
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.9111,
+        "f1": 0.9348,
+        "ipl": 0.7955,
+        "olist": 0.8444
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.8824,
+        "missing_column": 0.6,
+        "out_of_range": 0.9412,
+        "subjective": 1.0,
+        "write_request": 1.0
+      }
+    },
+    "weights": {
+      "qtype_imperative": 0.17329999804496765,
+      "starts_with_write_verb": 0.15839999914169312,
+      "year_out_of_range": 0.13289999961853027,
+      "unmatched_share": 0.08720000088214874,
+      "n_numbers": 0.06920000165700912,
+      "n_external_cues": 0.05689999833703041,
+      "n_opinion_words": 0.056299999356269836,
+      "n_unmatched_entities": 0.04600000008940697,
+      "schema_overlap": 0.039400000125169754,
+      "has_write_verb": 0.03319999948143959,
+      "n_content_words": 0.029400000348687172,
+      "qtype_how_many": 0.02160000056028366,
+      "qtype_which_what": 0.02019999921321869,
+      "n_years": 0.019899999722838402,
+      "unmatched_content_words": 0.015200000256299973,
+      "value_overlap": 0.012299999594688416,
+      "n_entities": 0.011099999770522118,
+      "hinglish_share": 0.010900000110268593,
+      "qtype_who": 0.006800000090152025,
+      "years_outside_by": 0.0,
+      "mentions_table_word": 0.0,
+      "qtype_when_where": 0.0,
+      "qtype_yes_no": 0.0
+    }
+  },
+  "english_only": {
+    "features": [
+      "n_words",
+      "n_content_words",
+      "schema_overlap",
+      "value_overlap",
+      "unmatched_content_words",
+      "unmatched_share",
+      "has_write_verb",
+      "starts_with_write_verb",
+      "mentions_table_word",
+      "n_opinion_words",
+      "n_external_cues",
+      "n_years",
+      "year_out_of_range",
+      "years_outside_by",
+      "n_numbers",
+      "n_entities",
+      "n_unmatched_entities",
+      "qtype_how_many",
+      "qtype_which_what",
+      "qtype_who",
+      "qtype_when_where",
+      "qtype_yes_no",
+      "qtype_imperative",
+      "hinglish_share"
+    ],
+    "n_train": 280,
+    "best": {
+      "model": "logreg",
+      "params": {
+        "clf__C": 0.01
+      },
+      "cv_macro_f1": 0.9032,
+      "cv_std": 0.0146
+    },
+    "per_family": {
+      "logreg": {
+        "params": {
+          "clf__C": 0.01
+        },
+        "cv_macro_f1": 0.9032,
+        "cv_std": 0.0146,
+        "test_macro_f1": 0.8888
+      },
+      "xgboost": {
+        "params": {
+          "learning_rate": 0.1,
+          "max_depth": 2,
+          "n_estimators": 100
+        },
+        "cv_macro_f1": 0.8889,
+        "cv_std": 0.0266,
+        "test_macro_f1": 0.9054
+      },
+      "random_forest": {
+        "params": {
+          "max_depth": 5,
+          "min_samples_leaf": 1
+        },
+        "cv_macro_f1": 0.8743,
+        "cv_std": 0.0378,
+        "test_macro_f1": 0.9054
+      }
+    },
+    "test": {
+      "n": 180,
+      "accuracy": 0.8888888888888888,
+      "macro_f1": 0.8888339920948616,
+      "unanswerable_precision": 0.8723404255319149,
+      "unanswerable_recall": 0.9111111111111111,
+      "unanswerable_f1": 0.8913043478260869,
+      "confusion_matrix": [
+        [
+          82,
+          8
+        ],
+        [
+          12,
+          78
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "csv": 0.9167,
+        "hinglish": 0.7667,
+        "hinglish_unanswerable": 0.9333,
+        "unanswerable": 0.9
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.8889,
+        "f1": 0.9565,
+        "ipl": 0.7955,
+        "olist": 0.9111
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.9412,
+        "missing_column": 0.75,
+        "out_of_range": 0.9412,
+        "subjective": 0.9474,
+        "write_request": 1.0
+      }
+    },
+    "weights": {
+      "n_words": 0.3315,
+      "unmatched_share": -0.2096,
+      "n_unmatched_entities": -0.1932,
+      "schema_overlap": 0.1923,
+      "n_opinion_words": -0.1913,
+      "n_external_cues": -0.1797,
+      "year_out_of_range": -0.1765,
+      "unmatched_content_words": -0.1646,
+      "n_numbers": 0.1588,
+      "starts_with_write_verb": -0.1465,
+      "qtype_imperative": -0.1465,
+      "years_outside_by": -0.1247,
+      "has_write_verb": -0.1245,
+      "qtype_which_what": 0.1197,
+      "qtype_yes_no": -0.0894,
+      "n_years": 0.0755,
+      "n_content_words": 0.0746,
+      "mentions_table_word": -0.0733,
+      "n_entities": -0.0658,
+      "qtype_how_many": 0.0283,
+      "value_overlap": 0.0062,
+      "qtype_when_where": 0.0017,
+      "qtype_who": -0.0009,
+      "hinglish_share": 0.0
+    }
+  }
+}
