@@ -1,4 +1,4 @@
-# Handoff: DataCopilot, state as of 2026-11-15
+# Handoff: DataCopilot, state as of 2026-11-17
 
 For a fresh Claude Code session on a new machine (MacBook M2, 16 GB). Read this first,
 then `README.md`, `data/questions/README.md` and `data/features/README.md`.
@@ -70,7 +70,7 @@ blindly rebuild answers: diff first, then decide.
 | 1. Proposal, charter, architecture, repo setup | Submitted |
 | 2. Research, design, basic prototype | Submitted |
 | 3. Data collection, cleaning, EDA, question sets, features | Submitted (report: `docs/reports/DataCopilot_Module3_Submission.pdf`, committed 2026-11-12) |
-| 4. Answerability classifier + baseline vs validated experiments | **In progress.** Features ready, nothing trained yet |
+| 4. Answerability classifier + baseline vs validated experiments | **In progress.** Classifier trained (step 2 done 2026-11-17); experiments next |
 | 5-8 | Not started |
 
 ### What exists (by area)
@@ -91,7 +91,10 @@ blindly rebuild answers: diff first, then decide.
   or execution error; `use_validator=False` = baseline (one attempt, no schema check,
   read-only guard kept).
 - `features.py`: answerability features (see `data/features/README.md`).
-- `answerability.py`, `explainer.py`: stubs (Module 4 / 6).
+- `answerability.py`: grouped-CV model search (logreg / RF / XGBoost), `evaluate`,
+  `save_model` / `load_model`, `predict_answerable`. Model in `models/answerability.joblib`
+  (3 KB, committed; rebuild with `scripts/train_answerability.py`). Results: `docs/results/`.
+- `explainer.py`: stub (Module 6).
 
 **Scripts** (`scripts/`)
 - `ask.py`: CLI, CSV question → SQL + result (`python scripts/ask.py data/sample/sales.csv "..."`).
@@ -110,8 +113,8 @@ blindly rebuild answers: diff first, then decide.
 - BIRD dev, first 10 questions (all `california_schools`), qwen2.5-coder:7b:
   **validated 7/10, baseline 6/10** (2026-11-11). Smoke test only, not a benchmark.
 - Question sets: 200 English answerable, 100 Hinglish answerable, 200 English
-  unanswerable, 50 Hinglish unanswerable; 70/30 train/test (seed 42).
-- Features: 550 rows x 24 features. Strongest train-split signals: `schema_overlap`
+  unanswerable, 100 Hinglish unanswerable (50 added 2026-11-17); 70/30 train/test (seed 42).
+- Features: 600 rows x 24 features. Strongest train-split signals: `schema_overlap`
   (0.54 answerable vs 0.29 unanswerable), `unmatched_share`, write-verb / imperative,
   opinion and external-cue counts, out-of-range years, unmatched entities.
 
@@ -199,17 +202,17 @@ blindly rebuild answers: diff first, then decide.
 
 ## 6. Open decisions (need the user)
 
-1. **Hinglish class balance:** add ~50 more Hinglish unanswerable questions (to 100) so
-   `hinglish_share` doesn't leak the label? Or reweight in training.
-2. **`n_words` in the model:** keep, drop, or report an ablation (train with and without).
+1. ~~Hinglish class balance~~ Resolved 2026-11-17: 50 Hinglish unanswerable questions
+   added (100 total, 5 per dataset x type).
+2. ~~`n_words`~~ Resolved 2026-11-17: kept in the main model; "without n_words" reported
+   as an ablation.
 3. ~~Module 3 status in `docs/planning/milestones.md`~~ Resolved 2026-11-15: Module 3
    "Submitted", Module 4 "In progress".
-4. **BIRD scale for Module 4 experiments:** full 1,534 dev questions takes hours on a 7B
-   local model; pick a stratified subset size (e.g. 200-300) and whether to also run the
-   cleaned 20251106 split.
+4. ~~BIRD scale~~ Resolved 2026-11-17: fixed-seed sample of 300 dev questions stratified
+   across all 11 databases; cleaned 20251106 split skipped for now.
 5. ~~Pin dependencies now or at Module 5.~~ Resolved 2026-11-15: top-level packages
    pinned in `requirements.txt` to the versions installed on the Windows machine.
-6. **SQLAlchemy for SQLite/PostgreSQL** (CLAUDE.md names it) vs keeping stdlib `sqlite3`.
+6. ~~SQLAlchemy~~ Resolved 2026-11-17: keep stdlib `sqlite3` until PostgreSQL work.
 
 ---
 
@@ -219,7 +222,7 @@ Goal (milestones): **answerability classifier + baseline vs validated pipeline e
 
 1. **Setup check** (section 1): data rebuilt, `build_questions.py --check` passes,
    `pytest` green, Ollama responds (`python scripts/ask.py data/sample/sales.csv "Which city had the highest total revenue?"` → Mumbai, 1,185,500).
-2. **Train the classifier** (new `scripts/train_answerability.py`, `src/datacopilot/pipeline/answerability.py`):
+2. **DONE 2026-11-17. Train the classifier** (new `scripts/train_answerability.py`, `src/datacopilot/pipeline/answerability.py`):
    - Input: `data/features/answerability_features.csv`, columns `FEATURE_NAMES` only;
      label `answerable`; **fit on `split == "train"` only**.
    - Models: logistic regression (baseline, interpretable), random forest, XGBoost
