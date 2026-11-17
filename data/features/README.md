@@ -2,8 +2,8 @@
 
 `answerability_features.csv` is built by `scripts/build_features.py` with
 `datacopilot.pipeline.features.extract_features`. One row per question from all four
-question sets in `data/questions/` (550 rows: 200 English answerable, 200 English
-unanswerable, 100 Hinglish answerable, 50 Hinglish unanswerable).
+question sets in `data/questions/` (600 rows: 200 English answerable, 200 English
+unanswerable, 100 Hinglish answerable, 100 Hinglish unanswerable).
 
 ## Columns
 
@@ -39,9 +39,10 @@ columns with at most 20,000 distinct values (id columns and free text are skippe
   Check its weight in Module 4 and compare against a model trained without it.
 - `ends_with_question_mark` was removed for the same reason: written write-requests
   end with "." while every answerable question ends with "?".
-- Hinglish rows are unbalanced: 100 answerable vs 50 unanswerable, so across all rows
-  `hinglish_share` is higher for answerable questions (0.16 vs 0.08 on train). Within
-  Hinglish rows the two classes are similar (0.49 vs 0.41).
+- Hinglish rows were unbalanced (100 answerable vs 50 unanswerable), which made
+  `hinglish_share` leak the label (0.16 vs 0.08 on train). 50 Hinglish unanswerable
+  questions were added on 2026-11-17, so both classes now have 100 Hinglish rows and the
+  gap is small (0.16 vs 0.13 on train; within Hinglish rows 0.49 vs 0.40).
 
 ## Splits
 
