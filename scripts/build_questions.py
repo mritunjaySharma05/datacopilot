@@ -30,8 +30,8 @@ from datacopilot.questions import (  # noqa: E402
 
 # Expected rows per dataset in each file.
 # An int means exactly that many; a (min, max) tuple allows a small spread across datasets.
-EXPECTED_PER_DATASET = {"csv": 50, "hinglish": 25, "unanswerable": 50, "hinglish_unanswerable": (12, 13)}
-EXPECTED_TOTAL = {"hinglish_unanswerable": 50}
+EXPECTED_PER_DATASET = {"csv": 50, "hinglish": 25, "unanswerable": 50, "hinglish_unanswerable": 25}
+EXPECTED_TOTAL = {"hinglish_unanswerable": 100}
 # Each Hinglish set is a translation of this source set.
 HINGLISH_SOURCE = {"hinglish": "csv", "hinglish_unanswerable": "unanswerable"}
 ANSWERABLE_SETS = {"csv", "hinglish"}

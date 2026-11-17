@@ -8,7 +8,7 @@ Our own question sets for evaluating DataCopilot on the four Module 3 datasets
 | `csv_questions.jsonl` | 200 | 50 answerable questions per dataset (easy / medium / hard) |
 | `hinglish_questions.jsonl` | 100 | Hinglish versions of 25 English questions per dataset |
 | `unanswerable_questions.jsonl` | 200 | 50 per dataset, 10 of each unanswerable type |
-| `hinglish_unanswerable.jsonl` | 50 | Hinglish versions of 50 unanswerable questions (12-13 per dataset, 10 per type) |
+| `hinglish_unanswerable.jsonl` | 100 | Hinglish versions of 100 unanswerable questions (25 per dataset, 5 of each type per dataset) |
 
 ## Row format (one JSON object per line)
 
