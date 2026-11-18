@@ -6,8 +6,11 @@ is compared with the stored gold_answer:
 
   strict   same rows and values as the gold answer (datacopilot.questions.answers_match;
            row order only matters if the gold SQL has an outer ORDER BY)
-  relaxed  every gold column appears in the result, numbers rounded to the gold precision
-           (extra columns and unrounded averages allowed; answers_match_relaxed)
+  relaxed  secondary metric (answers_match_relaxed), rules fixed on 2026-11-18 after seeing the
+           first step 3 results: every gold column appears in the result (extra columns and
+           unrounded averages allowed) OR exactly the non-aggregate key columns appear (the
+           count is left out); row order only matters for ranking / top-N questions (gold
+           has ORDER BY and LIMIT > 1)
 
 Olist runs as SQLite on olist.sqlite; IPL, F1 and crop as DuckDB on the processed CSVs.
 
@@ -15,6 +18,8 @@ Usage:
     python scripts/eval_questions.py                         # test split, csv + hinglish, both modes
     python scripts/eval_questions.py --sets heldout          # human held-out answerable questions
     python scripts/eval_questions.py --modes validated --limit 5
+    python scripts/eval_questions.py --rescore data/results/questions_*.csv --report R.md
+                                     # re-run stored SQL, recompute metrics (no LLM)
 """
 import argparse
 import sys
@@ -29,12 +34,13 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from datacopilot.pipeline.executor import run_query  # noqa: E402
 from datacopilot.pipeline.profiler import get_schema, get_sqlite_schema  # noqa: E402
 from datacopilot.pipeline.runner import SQLAttemptError, answer  # noqa: E402
 from datacopilot.pipeline.sql_generator import generate_sql  # noqa: E402
 from datacopilot.questions import (  # noqa: E402
     DIALECT, PROCESSED_DIR, QUESTIONS_DIR, answers_match, answers_match_relaxed, connect, is_ordered,
-    load_heldout, load_question_set, normalize_value,
+    is_ranking, key_columns, load_heldout, load_question_set, normalize_value,
 )
 
 DEFAULT_OUT_DIR = ROOT / "data" / "results"
@@ -74,6 +80,13 @@ def result_rows(df: pd.DataFrame) -> list[list]:
     return [[normalize_value(v) for v in row] for row in df.itertuples(index=False, name=None)]
 
 
+def score(row: dict, rows: list[list]) -> tuple[bool, bool]:
+    """(strict, relaxed) for one question's predicted result rows."""
+    gold, sql, dialect = row["gold_answer"], row["gold_sql"], DIALECT[row["dataset"]]
+    return (answers_match(gold, rows, is_ordered(sql)),
+            answers_match_relaxed(gold, rows, is_ranking(sql, dialect), key_columns(sql, dialect)))
+
+
 def status_of(error: str) -> str:
     """Failure category from a SQLAttemptError message."""
     return "validation_failed" if error.startswith("Validation failed") else "execution_failed"
@@ -92,12 +105,28 @@ def evaluate_question(row: dict, conn, schema: dict, use_validator: bool = True,
     except SQLAttemptError as err:
         record.update(pred_sql=err.sql, error=str(err), status=status_of(str(err)))
     else:
-        rows, ordered = result_rows(df), is_ordered(row["gold_sql"])
-        record.update(pred_sql=sql, strict=answers_match(row["gold_answer"], rows, ordered),
-                      relaxed=answers_match_relaxed(row["gold_answer"], rows, ordered))
+        strict, relaxed = score(row, result_rows(df))
+        record.update(pred_sql=sql, strict=strict, relaxed=relaxed)
         record["status"] = "correct" if record["strict"] else "wrong_result"
     record["seconds"] = round(time.monotonic() - start, 2)
     return record
+
+
+def rescore(records: pd.DataFrame, questions: dict[str, dict], datasets: "Datasets") -> pd.DataFrame:
+    """Re-run each stored pred_sql that executed and recompute strict / relaxed (no LLM call).
+
+    Adds `strict_before` / `relaxed_before`; strict must not change (same SQL, same data).
+    """
+    out = records.copy()
+    out["strict_before"], out["relaxed_before"] = out.strict, out.relaxed
+    for i, rec in out.iterrows():
+        if rec.status not in ("correct", "wrong_result"):
+            continue
+        row = questions[rec.id]
+        conn, _ = datasets(row["dataset"])
+        strict, relaxed = score(row, result_rows(run_query(conn, rec.pred_sql, dialect=DIALECT[row["dataset"]])))
+        out.loc[i, ["strict", "relaxed"]] = [strict, relaxed]
+    return out
 
 
 def accuracy_table(records: pd.DataFrame, by: str) -> pd.DataFrame:
@@ -151,7 +180,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--processed-dir", type=Path, default=PROCESSED_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--report", type=Path, default=None, help=f"Markdown summary (e.g. {DEFAULT_REPORT})")
+    parser.add_argument("--rescore", nargs="+", type=Path, metavar="CSV",
+                        help="Recompute metrics for stored runs; writes <name>_rescored.csv next to each")
     args = parser.parse_args(argv)
+    if args.rescore:
+        return rescore_files(args.rescore, args.questions_dir, args.processed_dir, args.report)
 
     questions = load_questions(args.sets, args.split, args.questions_dir)[: args.limit]
     datasets = Datasets(args.processed_dir)
@@ -184,6 +217,28 @@ def main(argv: list[str] | None = None) -> int:
         args.report.write_text(report(pd.DataFrame(all_records), title), encoding="utf-8")
         print(f"Report: {args.report}")
     return 0
+
+
+def rescore_files(paths: list[Path], questions_dir: Path, processed_dir: Path, report_path: Path | None) -> int:
+    """Rescore stored run CSVs; exit code 1 if any strict result changed."""
+    questions = {r["id"]: r for r in load_questions(list(SETS), "all", questions_dir)}
+    datasets, frames, changed = Datasets(processed_dir), [], 0
+    for path in paths:
+        df = rescore(pd.read_csv(path), questions, datasets)
+        changed += int((df.strict != df.strict_before).sum())
+        out = path.with_name(f"{path.stem}_rescored.csv")
+        df.to_csv(out, index=False)
+        print(f"{path.name}: strict {df.strict.mean():.1%} (was {df.strict_before.mean():.1%}), "
+              f"relaxed {df.relaxed.mean():.1%} (was {df.relaxed_before.mean():.1%}) -> {out.name}")
+        frames.append(df)
+    if report_path:
+        sets = sorted(pd.concat(frames).question_set.unique())
+        report_path.write_text(report(pd.concat(frames), f"Pipeline accuracy: {', '.join(sets)} (rescored)"),
+                               encoding="utf-8")
+        print(f"Report: {report_path}")
+    if changed:
+        print(f"WARNING: {changed} strict result(s) changed on rescoring", file=sys.stderr)
+    return 1 if changed else 0
 
 
 if __name__ == "__main__":

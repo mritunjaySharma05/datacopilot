@@ -53,10 +53,39 @@ def test_evaluate_question_relaxed_only_for_extra_column_and_rounding(conn):
     assert rec["status"] == "wrong_result" and not rec["strict"] and rec["relaxed"]
 
 
-def test_evaluate_question_order_matters_with_order_by(conn):
+def test_order_by_without_limit_matters_for_strict_only(conn):
     rec = eq.evaluate_question(row(), conn, SCHEMA, generate=fake(
         "SELECT crop, SUM(production) FROM crop_production GROUP BY crop ORDER BY crop DESC"))
-    assert rec["status"] == "wrong_result" and not rec["strict"] and not rec["relaxed"]
+    assert rec["status"] == "wrong_result" and not rec["strict"] and rec["relaxed"]
+
+
+def test_ranking_question_order_matters_for_relaxed_too(conn):
+    r = {**row(), "gold_sql": GOLD_SQL + " LIMIT 2"}
+    rec = eq.evaluate_question(r, conn, SCHEMA, generate=fake(
+        "SELECT crop, SUM(production) FROM crop_production GROUP BY crop ORDER BY crop DESC"))
+    assert not rec["strict"] and not rec["relaxed"]
+
+
+def test_relaxed_accepts_key_column_without_count(conn):
+    r = {**row([["Rice", 15]]), "gold_sql": GOLD_SQL + " LIMIT 1"}
+    rec = eq.evaluate_question(r, conn, SCHEMA, generate=fake(
+        "SELECT crop FROM crop_production GROUP BY crop ORDER BY SUM(production) DESC LIMIT 1"))
+    assert not rec["strict"] and rec["relaxed"]
+    wrong_count = eq.evaluate_question(r, conn, SCHEMA, generate=fake(
+        "SELECT crop, COUNT(*) FROM crop_production GROUP BY crop ORDER BY SUM(production) DESC LIMIT 1"))
+    assert not wrong_count["relaxed"]  # key right, but a wrong count is present
+
+
+def test_rescore_reruns_stored_sql_and_keeps_strict(conn):
+    q = {**row([["Rice", 15]]), "gold_sql": GOLD_SQL + " LIMIT 1"}
+    recs = pd.DataFrame([
+        {"id": "crop-001", "status": "wrong_result", "strict": False, "relaxed": False,
+         "pred_sql": "SELECT crop FROM crop_production GROUP BY crop ORDER BY SUM(production) DESC LIMIT 1"},
+        {"id": "crop-001", "status": "execution_failed", "strict": False, "relaxed": False, "pred_sql": "SELECT x"},
+    ])
+    out = eq.rescore(recs, {"crop-001": q}, lambda ds: (conn, SCHEMA))
+    assert out.relaxed.tolist() == [True, False] and out.relaxed_before.tolist() == [False, False]
+    assert (out.strict == out.strict_before).all()
 
 
 def test_validated_mode_retries_after_validation_error(conn):
