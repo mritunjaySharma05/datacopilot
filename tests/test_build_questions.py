@@ -157,3 +157,57 @@ def test_main_reports_problems(built, processed, capsys):
     _edit(built, "csv", lambda rows: rows[0].update(gold_answer=[[0]]))
     assert bq.main(["--check", "--questions-dir", str(built), "--processed-dir", str(processed)]) == 1
     assert "problem(s)" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- human held-out set
+
+def heldout_rows() -> list[dict]:
+    base = {"split": "heldout", "gold_answer": None, "difficulty": "easy"}
+    return [
+        {**base, "id": "human-001", "dataset": "ipl", "question": "runs above 110 kitne?", "language": "hinglish",
+         "gold_sql": "SELECT COUNT(*) FROM ipl_matches WHERE runs > 110", "answerable": True,
+         "unanswerable_type": None},
+        {**base, "id": "human-002", "dataset": "f1", "question": "who is the best driver", "language": "en",
+         "gold_sql": None, "answerable": False, "unanswerable_type": "subjective"},
+    ]
+
+
+@pytest.fixture
+def with_heldout(built, processed):
+    write_jsonl(built / bq.HELDOUT_FILE, heldout_rows())
+    assert bq.build(built, processed) == []
+    return built
+
+
+def test_build_fills_heldout_answers_and_keeps_split(with_heldout, processed):
+    rows = read_jsonl(with_heldout / bq.HELDOUT_FILE)
+    assert [r["split"] for r in rows] == ["heldout", "heldout"]
+    assert rows[0]["gold_answer"] == [[9]] and rows[1]["gold_answer"] is None
+    assert bq.check(with_heldout, processed) == []
+    assert "human_heldout.jsonl" in bq.summary(with_heldout)
+
+
+def test_build_heldout_reports_failures_without_dropping(processed):
+    rows = heldout_rows()
+    rows[0]["gold_sql"] = "SELECT nope FROM ipl_matches"
+    out, failed = bq.build_heldout(rows, bq.Connections(processed))
+    assert len(out) == 2 and out[0]["gold_answer"] is None
+    assert failed and "human-001" in failed[0]
+
+
+@pytest.mark.parametrize("mutate, expected", [
+    (lambda rows: rows[0].update(gold_answer=[[999]]), "stored gold_answer differs"),
+    (lambda rows: rows[0].update(split="train"), "bad split"),
+    (lambda rows: rows[1].update(language="fr"), "language must be one of"),
+    (lambda rows: rows[1].update(id="human-001"), "duplicate id"),
+    (lambda rows: rows[1].update(id="ipl-000"), "duplicate id"),
+    (lambda rows: rows[1].update(question="RUNS above 110 kitne?"), "duplicate question"),
+    (lambda rows: rows[0].update(question="ipl count above 3?"), "same question as ipl-003"),
+    (lambda rows: rows[1].update(unanswerable_type="opinion"), "bad unanswerable_type"),
+])
+def test_check_catches_heldout_problems(with_heldout, processed, mutate, expected):
+    rows = read_jsonl(with_heldout / bq.HELDOUT_FILE)
+    mutate(rows)
+    write_jsonl(with_heldout / bq.HELDOUT_FILE, rows)
+    problems = bq.check(with_heldout, processed)
+    assert any(expected in p for p in problems), problems

@@ -9,6 +9,7 @@ Our own question sets for evaluating DataCopilot on the four Module 3 datasets
 | `hinglish_questions.jsonl` | 100 | Hinglish versions of 25 English questions per dataset |
 | `unanswerable_questions.jsonl` | 200 | 50 per dataset, 10 of each unanswerable type |
 | `hinglish_unanswerable.jsonl` | 100 | Hinglish versions of 100 unanswerable questions (25 per dataset, 5 of each type per dataset) |
+| `human_heldout.jsonl` | 30 | Human held-out set: 15 answerable, 15 unanswerable, casual English and Hinglish. **Evaluation only** (see below) |
 
 ## Row format (one JSON object per line)
 
@@ -49,3 +50,24 @@ which only returns train rows. Test rows are for final evaluation only.
 
 Needs `data/processed/` (run `scripts/prepare_data.py` first). Answers depend on the
 processed data: if the raw data or cleaning changes, rebuild and review the diff.
+
+## Human held-out set (`human_heldout.jsonl`)
+
+30 questions written to look like real user input: lowercase, abbreviations ("avg",
+"csk", "gp"), missing question marks, long chatty requests, and Hinglish with varied
+spelling ("me" / "mein"). **They were drafted with AI help, then reviewed and edited by
+the project author** (2026-11-18); they are not independent user questions, so results on
+this set are a robustness check, not a measure of real-user performance.
+
+- Ids `human-001` ... `human-030`, `split = "heldout"`, plus a `language` field
+  (`en` / `hinglish`). Labels are the author's; `unanswerable_type` was assigned where the
+  type was clear. human-027 (which crop a Rajasthan farmer should grow "given how prices
+  have moved") is labeled `subjective` but also needs price data that does not exist.
+- Gold SQL was written against `data/processed` and its answers are re-verified by
+  `build_questions.py --check`, like the other sets.
+- **Never use these rows for training, feature selection, model choice, threshold tuning
+  or prompt examples.** They are not in `SET_FILES`, so `train_examples()` and
+  `build_features.py` never see them; load them with `datacopilot.questions.load_heldout()`.
+- Some questions paraphrase questions in the main sets (e.g. human-009 "avg review score?"
+  vs olist-008, human-011 vs olist-009, human-001 vs ipl-018). The texts differ, but the
+  intent overlaps, so the held-out set is not fully independent of the training data.

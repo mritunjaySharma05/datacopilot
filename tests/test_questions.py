@@ -86,3 +86,18 @@ def test_real_question_files_never_leak_test_into_training_pool():
     pool = qs.train_examples()
     assert not test_ids & {r["id"] for r in pool}
     assert not test_ids & {r.get("source_id") for r in pool}
+
+
+def test_load_heldout_rejects_other_splits(tmp_path):
+    rows = [{"id": "human-001", "split": "heldout"}, {"id": "human-002", "split": "train"}]
+    qs.write_jsonl(tmp_path / qs.HELDOUT_FILE, rows[:1])
+    assert [r["id"] for r in qs.load_heldout(tmp_path)] == ["human-001"]
+    qs.write_jsonl(tmp_path / qs.HELDOUT_FILE, rows)
+    with pytest.raises(AssertionError, match="human-002"):
+        qs.load_heldout(tmp_path)
+
+
+def test_real_heldout_is_never_in_training_pool():
+    heldout_ids = {r["id"] for r in qs.load_heldout()}
+    assert len(heldout_ids) == 30
+    assert not heldout_ids & {r["id"] for r in qs.train_examples()}

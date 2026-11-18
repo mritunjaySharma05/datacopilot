@@ -4,7 +4,8 @@ Question rows (JSONL) have: id, dataset, question, gold_sql, gold_answer, answer
 unanswerable_type, difficulty, split. Rows of both Hinglish sets also have source_id.
 
 Test questions must never be used for prompt examples or training: use
-`train_examples()`, which only ever returns train-split rows.
+`train_examples()`, which only ever returns train-split rows. The human held-out set
+(HELDOUT_FILE, split "heldout") is evaluation-only and is never part of SET_FILES.
 """
 import datetime as dt
 import decimal
@@ -30,6 +31,10 @@ SET_FILES = {
     "unanswerable": "unanswerable_questions.jsonl",
     "hinglish_unanswerable": "hinglish_unanswerable.jsonl",
 }
+# Human-reviewed held-out questions: evaluation only, never training or prompt examples.
+HELDOUT_FILE = "human_heldout.jsonl"
+HELDOUT_SPLIT = "heldout"
+LANGUAGES = ("en", "hinglish")
 DIFFICULTIES = ("easy", "medium", "hard")
 UNANSWERABLE_TYPES = ("missing_column", "out_of_range", "external_knowledge", "subjective", "write_request")
 FIELDS = ("id", "dataset", "question", "gold_sql", "gold_answer", "answerable", "unanswerable_type",
@@ -154,3 +159,11 @@ def train_examples(dataset: str | None = None, questions_dir: Path = QUESTIONS_D
     leaked = [r["id"] for r in rows if r["split"] != "train"]
     assert not leaked, f"test rows in training pool: {leaked}"
     return [r for r in rows if dataset is None or r["dataset"] == dataset]
+
+
+def load_heldout(questions_dir: Path = QUESTIONS_DIR) -> list[dict]:
+    """The human held-out questions (evaluation only; every row has split "heldout")."""
+    rows = read_jsonl(questions_dir / HELDOUT_FILE)
+    wrong = [r["id"] for r in rows if r["split"] != HELDOUT_SPLIT]
+    assert not wrong, f"held-out rows with another split: {wrong}"
+    return rows

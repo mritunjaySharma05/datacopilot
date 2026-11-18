@@ -14,6 +14,10 @@ Hinglish row (so a test question never leaks into train through its translation)
 Check: field schema and allowed values, unique ids and questions, balanced unanswerable
 types, expected counts, splits equal to the seeded assignment (~70/30), Hinglish linked to
 its English source, and every gold_sql re-run gives the stored gold_answer.
+
+The human held-out set (human_heldout.jsonl, split "heldout") is built and checked the same
+way, but never gets a train/test split and is never dropped from: a failing gold_sql is
+reported as a problem instead.
 """
 import argparse
 import sys
@@ -24,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from datacopilot.questions import (  # noqa: E402
-    DATASETS, DIFFICULTIES, FIELDS, QUESTIONS_DIR, PROCESSED_DIR, SET_FILES, TEST_SHARE, UNANSWERABLE_TYPES,
+    DATASETS, DIFFICULTIES, FIELDS, HELDOUT_FILE, HELDOUT_SPLIT, LANGUAGES, QUESTIONS_DIR, PROCESSED_DIR, SET_FILES, TEST_SHARE, UNANSWERABLE_TYPES,
     answers_match, assign_splits, connect, is_ordered, read_jsonl, run_gold, write_jsonl, MAX_ANSWER_ROWS,
 )
 
@@ -119,12 +123,31 @@ def build(questions_dir: Path, processed_dir: Path) -> list[str]:
             hi_rows, dropped = build_hinglish(read_jsonl(path), sources[source])
             messages += dropped
             write_jsonl(path, hi_rows)
+    heldout_path = questions_dir / HELDOUT_FILE
+    if heldout_path.exists():
+        heldout, failed = build_heldout(read_jsonl(heldout_path), conns)
+        messages += failed
+        write_jsonl(heldout_path, heldout)
     return messages
+
+
+def build_heldout(rows: list[dict], conns: Connections) -> tuple[list[dict], list[str]]:
+    """Fill gold_answer for answerable held-out rows; keep every row (failures are reported)."""
+    out, failed = [], []
+    for row in rows:
+        row = {**row, "gold_answer": None}
+        if row["answerable"]:
+            try:
+                row["gold_answer"] = run_gold(conns(row["dataset"]), row["gold_sql"], row["dataset"])
+            except Exception as err:  # noqa: BLE001
+                failed.append(f"{row['id']}: held-out gold_sql failed ({type(err).__name__}: {str(err)[:120]})")
+        out.append(row)
+    return out, failed
 
 
 # ---------------------------------------------------------------- check
 
-def check_schema(name: str, rows: list[dict]) -> list[str]:
+def check_schema(name: str, rows: list[dict], splits: tuple[str, ...] = ("train", "test")) -> list[str]:
     """Fields, types and allowed values for one file."""
     problems = []
     required = set(FIELDS) | ({"source_id"} if name in HINGLISH_SOURCE else set())
@@ -138,7 +161,7 @@ def check_schema(name: str, rows: list[dict]) -> list[str]:
             problems.append(f"{name}/{rid}: unknown dataset {row['dataset']!r}")
         if row["difficulty"] not in DIFFICULTIES:
             problems.append(f"{name}/{rid}: bad difficulty {row['difficulty']!r}")
-        if row["split"] not in ("train", "test"):
+        if row["split"] not in splits:
             problems.append(f"{name}/{rid}: bad split {row['split']!r}")
         if not isinstance(row["question"], str) or not row["question"].strip():
             problems.append(f"{name}/{rid}: empty question")
@@ -154,10 +177,28 @@ def check_schema(name: str, rows: list[dict]) -> list[str]:
                 problems.append(f"{name}/{rid}: unanswerable rows must have null gold_sql / gold_answer")
         else:
             problems.append(f"{name}/{rid}: answerable must be true/false")
+    if name == "heldout":  # mixed labels by design
+        return problems
     expected_answerable = name in ANSWERABLE_SETS
     wrong = [r["id"] for r in rows if r.get("answerable") is not expected_answerable]
     if wrong:
         problems.append(f"{name}: rows with answerable != {expected_answerable}: {wrong[:5]}")
+    return problems
+
+
+def check_heldout(rows: list[dict], other: dict[str, list[dict]]) -> list[str]:
+    """Held-out set: schema with split "heldout", a language tag, no question copied from another set."""
+    problems = check_schema("heldout", rows, splits=(HELDOUT_SPLIT,))
+    problems += [f"heldout/{r.get('id', '?')}: language must be one of {LANGUAGES}"
+                 for r in rows if r.get("language") not in LANGUAGES]
+    seen = {(r["dataset"], norm_question(r["question"])): r["id"] for rs in other.values() for r in rs}
+    problems += [f"heldout/{r['id']}: same question as {seen[(r['dataset'], norm_question(r['question']))]}"
+                 for r in rows if (r.get("dataset"), norm_question(r.get("question", ""))) in seen]
+    other_ids = {r["id"] for rs in other.values() for r in rs}
+    ids = Counter(r.get("id") for r in rows)
+    problems += [f"heldout: duplicate id {i}" for i, n in ids.items() if n > 1 or i in other_ids]
+    texts = Counter(norm_question(r.get("question", "")) for r in rows)
+    problems += [f"heldout: duplicate question {q!r}" for q, n in texts.items() if n > 1]
     return problems
 
 
@@ -253,8 +294,15 @@ def check(questions_dir: Path, processed_dir: Path, run_sql: bool = True) -> lis
     problems += check_duplicates(rows)
     # Re-run gold SQL whenever the English rows are well-formed, even if other checks failed,
     # so a wrong stored answer is always reported.
+    heldout_path = questions_dir / HELDOUT_FILE
+    heldout = read_jsonl(heldout_path) if heldout_path.exists() else []
+    heldout_problems = check_heldout(heldout, rows) if heldout else []
+    problems += heldout_problems
+    conns = Connections(processed_dir)
     if run_sql and schema_ok["csv"]:
-        problems += check_answers(rows["csv"], Connections(processed_dir))
+        problems += check_answers(rows["csv"], conns)
+    if run_sql and heldout and not heldout_problems:
+        problems += check_answers([r for r in heldout if r["answerable"]], conns)
     return problems
 
 
@@ -267,6 +315,11 @@ def summary(questions_dir: Path) -> str:
         diff = Counter(r["difficulty"] for r in rows)
         lines.append(f"  {f:30} {len(rows):4} rows | train {split['train']:3} test {split['test']:3} | "
                      + " ".join(f"{d} {diff[d]}" for d in DIFFICULTIES))
+    if (questions_dir / HELDOUT_FILE).exists():
+        rows = read_jsonl(questions_dir / HELDOUT_FILE)
+        n_ans = sum(r["answerable"] for r in rows)
+        lines.append(f"  {HELDOUT_FILE:30} {len(rows):4} rows | heldout (evaluation only) | "
+                     f"answerable {n_ans} unanswerable {len(rows) - n_ans}")
     return "\n".join(lines)
 
 
