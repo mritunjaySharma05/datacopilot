@@ -260,7 +260,8 @@ Goal (milestones): **answerability classifier + baseline vs validated pipeline e
    12 false refusals, McNemar p < 0.0001).** **Answerability gate experiment:** classifier first; if "unanswerable", refuse instead of
    generating SQL. Measure correct refusals on the unanswerable sets and false refusals on
    answerable ones, and end-to-end accuracy with vs without the gate.
-5. **BIRD:** rerun `eval_bird.py` on a larger agreed subset in both modes (decision 4).
+5. **DONE 2026-11-19 (`docs/results/bird.md`: validated 52.3% vs baseline 51.0% on a
+   300-question stratified sample, 4 vs 0 discordant, McNemar p = 0.125).** **BIRD:** rerun `eval_bird.py` on a larger agreed subset in both modes (decision 4).
 6. **Write up** results tables + error analysis for the Module 4 report; update milestones.
 
 Few-shot prompting, if tried, must draw examples from `train_examples()` only.
