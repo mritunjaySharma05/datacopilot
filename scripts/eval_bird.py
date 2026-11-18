@@ -7,10 +7,12 @@ Usage:
     python scripts/eval_bird.py                  # first 10 questions, validated pipeline
     python scripts/eval_bird.py --n 50
     python scripts/eval_bird.py --no-validator   # baseline: one attempt, no schema check
+    python scripts/eval_bird.py --sample 300     # seeded sample stratified by database (seed 42)
 """
 import argparse
 import json
 import math
+import random
 import sys
 import time
 from datetime import datetime
@@ -31,6 +33,7 @@ from datacopilot.pipeline.sql_generator import generate_sql  # noqa: E402
 DEFAULT_BIRD_DIR = ROOT / "data" / "benchmarks" / "bird_dev"
 DEFAULT_OUT_DIR = ROOT / "data" / "results"
 DEFAULT_N = 10
+DEFAULT_SEED = 42
 QUERY_TIMEOUT_S = 30  # BIRD's official evaluation also uses a per-query timeout
 DIALECT = "sqlite"
 
@@ -51,10 +54,33 @@ def find_db(bird_dir: Path, db_id: str) -> Path:
     raise FileNotFoundError(f"Database {db_id} not found under {bird_dir}")
 
 
-def load_questions(bird_dir: Path, n: int) -> list[dict]:
-    """Load the first `n` BIRD dev questions."""
+def load_questions(bird_dir: Path, n: int | None) -> list[dict]:
+    """Load the first `n` BIRD dev questions (all if None)."""
     with open(find_dev_json(bird_dir), encoding="utf-8") as f:
         return json.load(f)[:n]
+
+
+def stratified_sample(questions: list[dict], n: int, seed: int = DEFAULT_SEED) -> list[dict]:
+    """Seeded sample of `n` questions, allocated to databases in proportion to their size.
+
+    Allocation uses largest remainders (ties broken by db_id); within each database the
+    questions are drawn with random.Random(f"{seed}|{db_id}"). The result keeps the original
+    dev.json order. Same questions + n + seed -> same sample.
+    """
+    if n >= len(questions):
+        return list(questions)
+    by_db: dict[str, list[int]] = {}
+    for i, q in enumerate(questions):
+        by_db.setdefault(q["db_id"], []).append(i)
+    quotas = {db: n * len(ids) / len(questions) for db, ids in by_db.items()}
+    alloc = {db: int(q) for db, q in quotas.items()}
+    leftover = n - sum(alloc.values())
+    for db in sorted(quotas, key=lambda d: (-(quotas[d] - alloc[d]), d))[:leftover]:
+        alloc[db] += 1
+    chosen = []
+    for db, ids in sorted(by_db.items()):
+        chosen += random.Random(f"{seed}|{db}").sample(ids, alloc[db])
+    return [questions[i] for i in sorted(chosen)]
 
 
 def _normalize(value: object) -> object:
@@ -125,17 +151,20 @@ def evaluate_question(
         record["seconds"] = round(time.monotonic() - start, 2)
 
 
-def output_path(out_dir: Path, use_validator: bool, now: datetime | None = None) -> Path:
-    """data/results/bird_<mode>_<timestamp>.csv, mode = validated | baseline."""
+def output_path(out_dir: Path, use_validator: bool, now: datetime | None = None, tag: str = "") -> Path:
+    """data/results/bird_<mode>[_<tag>]_<timestamp>.csv, mode = validated | baseline."""
     mode = "validated" if use_validator else "baseline"
     stamp = (now or datetime.now()).strftime("%Y%m%d_%H%M%S")
-    return out_dir / f"bird_{mode}_{stamp}.csv"
+    return out_dir / f"bird_{mode}{'_' + tag if tag else ''}_{stamp}.csv"
 
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point; returns a process exit code."""
     parser = argparse.ArgumentParser(description="Execution accuracy on the BIRD dev set.")
     parser.add_argument("--n", type=int, default=DEFAULT_N, help="Number of questions (from the start)")
+    parser.add_argument("--sample", type=int, default=None,
+                        help="Seeded sample of this many questions, stratified by database (overrides --n)")
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--no-validator", action="store_true", help="Baseline: no schema check, no retry")
     parser.add_argument("--bird-dir", type=Path, default=DEFAULT_BIRD_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
@@ -144,7 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     use_validator = not args.no_validator
 
     try:
-        questions = load_questions(args.bird_dir, args.n)
+        questions = (stratified_sample(load_questions(args.bird_dir, None), args.sample, args.seed)
+                     if args.sample else load_questions(args.bird_dir, args.n))
     except FileNotFoundError as err:
         print(err, file=sys.stderr)
         return 1
@@ -163,7 +193,8 @@ def main(argv: list[str] | None = None) -> int:
         note = f" ({record['error'][:80]})" if record["error"] else ""
         print(f"[{i}/{len(questions)}] {mark} q{record['question_id']} {record['db_id']}{note}")
 
-    out = output_path(args.out_dir, use_validator)
+    tag = f"sample{args.sample}_seed{args.seed}" if args.sample else ""
+    out = output_path(args.out_dir, use_validator, tag=tag)
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(records).to_csv(out, index=False)
 

@@ -140,3 +140,31 @@ def test_main_writes_csv_and_prints_accuracy(bird_dir, tmp_path, monkeypatch, ca
 def test_main_missing_bird_dir(tmp_path, capsys):
     assert ev.main(["--bird-dir", str(tmp_path / "none")]) == 1
     assert "download_bird.py" in capsys.readouterr().err
+
+
+def _fake_questions():
+    sizes = {"a": 50, "b": 30, "c": 15, "d": 5}
+    return [{"question_id": i, "db_id": db} for i, db in enumerate(db for db, k in sizes.items() for _ in range(k))]
+
+
+def test_stratified_sample_is_proportional_seeded_and_ordered():
+    qs = _fake_questions()
+    sample = ev.stratified_sample(qs, 20, seed=42)
+    counts = {db: sum(q["db_id"] == db for q in sample) for db in "abcd"}
+    assert counts == {"a": 10, "b": 6, "c": 3, "d": 1}
+    ids = [q["question_id"] for q in sample]
+    assert ids == sorted(ids) and len(set(ids)) == 20
+    assert ev.stratified_sample(qs, 20, seed=42) == sample
+    assert ev.stratified_sample(qs, 20, seed=7) != sample
+
+
+def test_stratified_sample_largest_remainder_and_full_set():
+    qs = _fake_questions()
+    sample = ev.stratified_sample(qs, 7, seed=1)  # quotas 3.5, 2.1, 1.05, 0.35 -> 3,2,1,0 + 1 to "a"
+    assert {db: sum(q["db_id"] == db for q in sample) for db in "abcd"} == {"a": 4, "b": 2, "c": 1, "d": 0}
+    assert ev.stratified_sample(qs, 500) == qs
+
+
+def test_output_path_with_tag(tmp_path):
+    now = datetime(2026, 11, 18, 9, 30, 0)
+    assert ev.output_path(tmp_path, True, now, "sample300_seed42").name == "bird_validated_sample300_seed42_20261118_093000.csv"
