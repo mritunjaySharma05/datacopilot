@@ -66,10 +66,33 @@ the entity features, validated on new questions, not the held-out set.
 qwen2.5-coder:7b, temperature 0, no few-shot examples. Test split = 90 answerable
 questions (60 English, 30 Hinglish); human held-out = its 15 answerable questions.
 
+**Metrics.** Strict is the primary metric: the predicted result has the same rows and
+values as the gold answer (row order counts if the gold SQL has an outer `ORDER BY`).
+Relaxed is secondary. **The relaxed rules below were defined after seeing the first step 3
+results** (decision 2026-11-18), to stop counting two kinds of correct answers as wrong;
+the numbers under them are therefore not a pre-registered measurement:
+
+1. every gold column appears in the prediction (extra columns allowed, numbers rounded to
+   the gold column's precision), or exactly the gold's non-aggregate key columns appear
+   (the count / aggregate is left out, e.g. "Which venue hosted the most matches?"
+   answered with the venue only; a wrong count next to the right key is not accepted);
+2. row order counts only for ranking / top-N questions (gold has `ORDER BY` and
+   `LIMIT > 1`), not for presentation-only `ORDER BY`.
+
+Columns that are stored values (e.g. `points` read from the standings table) count as
+keys, so "who scored the most points" answered without the points is still wrong. BIRD
+keeps its standard execution accuracy (same set of rows), unchanged.
+
 | Set | Validated strict | Baseline strict | Validated relaxed | Baseline relaxed |
 |---|---|---|---|---|
-| Test (90) | 33.3% | 33.3% | 36.7% | 36.7% |
-| Held-out answerable (15) | 20.0% | 20.0% | 26.7% | 26.7% |
+| Test (90) | 33.3% | 33.3% | 47.8% | 47.8% |
+| Held-out answerable (15) | 20.0% | 20.0% | 46.7% | 46.7% |
+
+The stored runs were rescored with the new relaxed rules (`eval_questions.py --rescore`,
+same SQL re-executed, no new LLM calls): strict unchanged on every question; relaxed
+gained 10 test questions (ipl-021, ipl-028, ipl-034, ipl-045, f1-018, f1-020, f1-028,
+crop-011, ipl-034-hi, f1-020-hi) and 3 held-out (human-003, human-005, human-014) and
+lost none. Under the old relaxed rule the figures were 36.7% (test) and 26.7% (held-out).
 
 - **The two modes do not differ on our sets.** The validator rejected 5 test queries
   (baseline: 6 execution errors instead) and changed the final SQL of 4 of 90 questions,
@@ -78,17 +101,7 @@ questions (60 English, 30 Hinglish); human held-out = its 15 answerable question
   all failures (55 of 60 validated failures on test) are valid SQL that returns the
   wrong answer, which a schema check cannot catch. On BIRD (smoke test, 10 questions)
   validation gained one question; step 5 measures this at scale.
-- **Hinglish is lower** (26.7% vs 36.7% English strict); F1 is the weakest dataset (13.0%),
-  e.g. counting a cancelled race (f1-019), summing cumulative standings across rounds
-  instead of taking the latest (f1-011), or counting top-3 championship positions after
-  each round as podiums instead of race results (f1-025).
-- **Measurement caveats (metric unchanged; decision pending):**
-  - 2 test questions (ipl-028, crop-011) fail relaxed matching only because of row order:
-    the gold SQL has an outer `ORDER BY` for presentation, so order counts even when the
-    question does not ask for it.
-  - 8 test questions (ipl-021, ipl-034, ipl-045, f1-018, f1-020, f1-028, ipl-034-hi,
-    f1-020-hi) and 3 held-out ones (human-003, human-005, human-014) answer "which X ...
-    the most" with just X, while the gold answer also has the count column; relaxed
-    matching requires every gold column, so these count as wrong.
-  - Counting both as correct would raise relaxed accuracy to about 47.8% on test (43/90)
-    and 46.7% on held-out (7/15), still with no difference between modes.
+- **Hinglish is lower** (26.7% vs 36.7% English strict); F1 is the weakest dataset (13.0%
+  strict), e.g. counting a cancelled race (f1-019), summing cumulative standings across
+  rounds instead of taking the latest (f1-011), or counting top-3 championship positions
+  after each round as podiums instead of race results (f1-025).

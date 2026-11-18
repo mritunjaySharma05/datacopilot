@@ -248,7 +248,9 @@ Goal (milestones): **answerability classifier + baseline vs validated pipeline e
    - Save the model (e.g. `models/answerability.joblib`, decide whether to commit) and
      add `predict_answerable(question, schema, context) -> (bool, probability)`.
    - Tests for every new function (CLAUDE.md rule).
-3. **Our-question-set evaluation** (new `scripts/eval_questions.py`, modelled on `eval_bird.py`):
+3. **DONE 2026-11-18 (results in `docs/results/README.md`: validated = baseline, 33.3% strict on
+   test, McNemar p = 1.0; relaxed metric redefined after seeing results, BIRD metric unchanged).
+   Our-question-set evaluation** (new `scripts/eval_questions.py`, modelled on `eval_bird.py`):
    - Run `csv_questions` + `hinglish_questions` (test split for the final numbers) through
      `runner.answer` in validated and baseline modes, compare with stored `gold_answer`
      using `datacopilot.questions.answers_match`.
