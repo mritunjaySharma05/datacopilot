@@ -167,3 +167,48 @@ def load_heldout(questions_dir: Path = QUESTIONS_DIR) -> list[dict]:
     wrong = [r["id"] for r in rows if r["split"] != HELDOUT_SPLIT]
     assert not wrong, f"held-out rows with another split: {wrong}"
     return rows
+
+
+def _decimals(column: list) -> int | None:
+    """Most decimal places among the float values of a gold column (None if it has no floats)."""
+    places = [len(repr(v).split(".")[1]) for v in column
+              if isinstance(v, float) and "." in repr(v) and "e" not in repr(v)]
+    return max(places) if places else None
+
+
+def _round_column(column: list, decimals: int | None) -> list:
+    if decimals is None:
+        return column
+    return [round(float(v), decimals) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+            for v in column]
+
+
+def _same_values(a: list, b: list) -> bool:
+    """Same multiset of values (floats with tolerance)."""
+    a, b = sorted(a, key=lambda v: _row_key([v])), sorted(b, key=lambda v: _row_key([v]))
+    return len(a) == len(b) and all(_values_match(x, y) for x, y in zip(a, b))
+
+
+def answers_match_relaxed(expected: list[list], actual: list[list], ordered: bool) -> bool:
+    """Lenient match: every gold column appears among the predicted columns.
+
+    Extra predicted columns are allowed, column order may differ, and predicted numbers are
+    rounded to the gold column's precision (so AVG without ROUND still matches). Rows must
+    still match one-to-one (in order if `ordered`).
+    """
+    if len(expected) != len(actual):
+        return False
+    if not expected:
+        return True
+    gold_cols = [list(c) for c in zip(*expected)]
+    pred_cols = [list(c) for c in zip(*actual)]
+    chosen, used = [], set()
+    for col in gold_cols:
+        d = _decimals(col)
+        match = next((k for k, p in enumerate(pred_cols)
+                      if k not in used and _same_values(col, _round_column(p, d))), None)
+        if match is None:
+            return False
+        used.add(match)
+        chosen.append(_round_column(pred_cols[match], d))
+    return answers_match(expected, [list(r) for r in zip(*chosen)], ordered)

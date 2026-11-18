@@ -101,3 +101,22 @@ def test_real_heldout_is_never_in_training_pool():
     heldout_ids = {r["id"] for r in qs.load_heldout()}
     assert len(heldout_ids) == 30
     assert not heldout_ids & {r["id"] for r in qs.train_examples()}
+
+
+@pytest.mark.parametrize("expected, actual, ordered, ok", [
+    ([[4.09]], [[4.0864]], False, True),                      # unrounded AVG, gold rounded to 2 places
+    ([["SP", 41746]], [[41746, "SP", 3]], False, True),       # extra column, different column order
+    ([[4]], [[4.09]], False, False),                          # integer gold is not rounded towards
+    ([["a", 1], ["b", 2]], [["b", 2], ["a", 1]], True, False),  # order matters with ORDER BY
+    ([["a", 1], ["b", 2]], [["b", 2], ["a", 1]], False, True),
+    ([["a", 1]], [["a", 1], ["b", 2]], False, False),         # row count must match
+    ([["a", 1]], [["a"]], False, False),                      # gold column missing
+    ([], [], False, True),
+])
+def test_answers_match_relaxed(expected, actual, ordered, ok):
+    assert qs.answers_match_relaxed(expected, actual, ordered) is ok
+
+
+def test_answers_match_relaxed_keeps_rows_aligned():
+    # Each column matches as a multiset, but the rows pair values differently.
+    assert not qs.answers_match_relaxed([["a", 1], ["b", 2]], [["a", 2], ["b", 1]], ordered=False)
