@@ -177,6 +177,12 @@ blindly rebuild answers: diff first, then decide.
   are not locked, so a fresh install may differ slightly between machines.
 - `prepare_data.py <one dataset>` overwrites `docs/data_quality/cleaning_log.md` with only
   that dataset's steps; run it with no arguments for the full log.
+- **Feature vocabulary gap (known limitation, for Module 6; decision 2026-11-18: do NOT
+  add features based on held-out misclassifications).** Derived-metric words ("sixes",
+  "economy", "podiums") are not column names, so `schema_overlap` is 0, and lowercase
+  player names ("kohli", "bumrah", "verstappen") are not counted as entities although they
+  match data values ("V Kohli"). Short Hinglish metric questions get refused (human-002,
+  human-004). Fix in Module 6 and validate on new questions, not the held-out set.
 - Question-feature caveats: `n_words` may be a writing-style artifact (unanswerable
   questions are shorter); Hinglish rows are 100 answerable vs 50 unanswerable, so overall
   `hinglish_share` leans answerable; "India" is treated as generic, so "races in India"
