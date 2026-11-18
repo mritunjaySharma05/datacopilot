@@ -58,13 +58,13 @@ def test_train_writes_model_report_and_metrics(tmp_path):
     model_out = tmp_path / "models" / "a.joblib"
     assert ta.train(features, tmp_path / "results", model_out, grids=TINY_GRIDS, n_folds=3) == 0
     bundle = load_model(model_out)
-    assert bundle["feature_names"] == list(FEATURE_NAMES) and bundle["n_train"] == 60
+    assert bundle["feature_names"] == [f for f in FEATURE_NAMES if f != "n_words"] and bundle["n_train"] == 60
     metrics = json.loads((tmp_path / "results" / "answerability_metrics.json").read_text())
     assert set(metrics) == set(ta.EXPERIMENTS)
     text = (tmp_path / "results" / "answerability.md").read_text()
     for heading in ("Experiments (test split)", "confusion matrix", "Recall per unanswerable type"):
         assert heading in text
-    assert "| main |" in text and "| no_n_words |" in text and "| english_only |" in text
+    assert "| main |" in text and "| with_n_words |" in text and "| english_only |" in text
 
 
 def test_pct_formats_percentage():

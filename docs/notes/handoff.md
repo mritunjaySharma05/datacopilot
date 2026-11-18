@@ -115,8 +115,9 @@ blindly rebuild answers: diff first, then decide.
 - Question sets: 200 English answerable, 100 Hinglish answerable, 200 English
   unanswerable, 100 Hinglish unanswerable (50 added 2026-11-17); 70/30 train/test (seed 42).
 - Human held-out set: 30 questions (`human_heldout.jsonl`, AI-drafted, human-edited,
-  split "heldout", evaluation only). Classifier: 90.6% on test but 66.7% on held-out;
-  without `n_words` 90.0% / 83.3% (`docs/results/README.md`).
+  split "heldout", evaluation only). It was used once to decide to drop `n_words`, so it
+  is no longer fully untouched. Deployed classifier (XGBoost, 23 features, no `n_words`):
+  test 87.2%, held-out 86.7% (`docs/results/README.md`).
 - Features: 600 rows x 24 features. Strongest train-split signals: `schema_overlap`
   (0.54 answerable vs 0.29 unanswerable), `unmatched_share`, write-verb / imperative,
   opinion and external-cue counts, out-of-range years, unmatched entities.
@@ -207,9 +208,11 @@ blindly rebuild answers: diff first, then decide.
 
 1. ~~Hinglish class balance~~ Resolved 2026-11-17: 50 Hinglish unanswerable questions
    added (100 total, 5 per dataset x type).
-2. **`n_words` (reopened 2026-11-18):** kept in the main model on 2026-11-17 with a
-   "without n_words" ablation. On the human held-out set the fair logreg ablation scores
-   66.7% with it vs 83.3% without (test: 90.6% vs 90.0%). Drop it from the deployed model?
+2. ~~`n_words`~~ Resolved 2026-11-18: dropped from the deployed model after the fair
+   logreg ablation on the human held-out set (66.7% with it vs 83.3% without; test 90.6%
+   vs 90.0%). Retrained with the same grouped CV: XGBoost, test 87.2%, held-out 86.7%.
+   **The held-out set was used once, for this decision only; it is no longer fully
+   untouched** (see `docs/results/README.md`). Do not tune anything else on it.
 3. ~~Module 3 status in `docs/planning/milestones.md`~~ Resolved 2026-11-15: Module 3
    "Submitted", Module 4 "In progress".
 4. ~~BIRD scale~~ Resolved 2026-11-17: fixed-seed sample of 300 dev questions stratified

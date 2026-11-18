@@ -1,7 +1,7 @@
 """Evaluate answerability classifiers on the 30-question human held-out set.
 
 Models:
-  main            the saved model (models/answerability.joblib)
+  main            the saved, deployed model (models/answerability.joblib; no n_words since 2026-11-18)
   logreg          logistic regression, C chosen by grouped 5-fold CV on train rows
   logreg_no_nwords  the same procedure without n_words (only that one feature differs)
 
@@ -93,15 +93,15 @@ def report(results: dict, n_heldout: int) -> str:
         "`data/questions/human_heldout.jsonl` (AI-drafted, human-edited; never used for training or",
         "model choice). Unanswerable is the positive class for precision / recall.",
         "",
-        "- **main**: the saved model (`models/answerability.joblib`).",
+        "- **main**: the deployed model (`models/answerability.joblib`, without `n_words`).",
         "- **logreg** vs **logreg_no_nwords**: fair `n_words` ablation. Both are logistic regression",
         "  with C chosen by the same grouped 5-fold CV on the same 420 train rows; only `n_words` differs.",
         "",
-        "| Model | C (by CV) | Set | Accuracy | Macro F1 | Unans. precision | Unans. recall | Errors |",
+        "| Model | Params (by CV) | Set | Accuracy | Macro F1 | Unans. precision | Unans. recall | Errors |",
         "|---|---|---|---|---|---|---|---|",
     ]
     for name, r in results.items():
-        c = r["params"].get("clf__C") if r["params"] else "-"
+        c = ", ".join(f"{k.removeprefix('clf__')}={v}" for k, v in (r["params"] or {}).items()) or "-"
         for split in ("test", "heldout"):
             m = r[split]
             errors = m["confusion_matrix"][0][1] + m["confusion_matrix"][1][0]

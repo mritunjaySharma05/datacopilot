@@ -28,6 +28,11 @@ MODEL_PATH = ROOT / "models" / "answerability.joblib"
 SEED = 42
 N_FOLDS = 5
 THRESHOLD = 0.5  # P(answerable) below this means "refuse"
+# Left out of the deployed model (decision 2026-11-18): question length was a writing-style
+# shortcut in our authored sets; on the human held-out set logreg scored 66.7% with it vs 83.3%
+# without (docs/results/README.md).
+EXCLUDED_FEATURES = ("n_words",)
+DEPLOYED_FEATURES = tuple(f for f in FEATURE_NAMES if f not in EXCLUDED_FEATURES)
 
 
 def make_estimator(name: str, seed: int = SEED):

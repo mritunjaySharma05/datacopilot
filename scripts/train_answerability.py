@@ -7,9 +7,9 @@ Reads data/features/answerability_features.csv. For each experiment:
   3. it is scored once on the test rows.
 
 Experiments:
-  main          all features, all train rows (English + Hinglish)  -> saved to models/
-  no_n_words    ablation: without n_words (possible writing-style artifact)
-  english_only  ablation: trained on English rows only, tested on all test rows
+  main          DEPLOYED_FEATURES (all but n_words), all train rows   -> saved to models/
+  with_n_words  ablation: adds n_words back (a writing-style shortcut; dropped 2026-11-18)
+  english_only  ablation: main features, trained on English rows only, tested on all test rows
 
 Writes docs/results/answerability.md (report) and docs/results/answerability_metrics.json.
 
@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from datacopilot.pipeline.answerability import (  # noqa: E402
-    MODEL_PATH, PARAM_GRIDS, cv_groups, evaluate, feature_weights, fit_best, save_model, search,
+    EXCLUDED_FEATURES, MODEL_PATH, PARAM_GRIDS, cv_groups, evaluate, feature_weights, fit_best, save_model, search,
 )
 from datacopilot.pipeline.features import FEATURE_NAMES  # noqa: E402
 
@@ -36,9 +36,9 @@ RESULTS_DIR = ROOT / "docs" / "results"
 ENGLISH_SETS = ("csv", "unanswerable")
 
 EXPERIMENTS = {
-    "main": {"drop": [], "train_sets": None},
-    "no_n_words": {"drop": ["n_words"], "train_sets": None},
-    "english_only": {"drop": [], "train_sets": ENGLISH_SETS},
+    "main": {"drop": list(EXCLUDED_FEATURES), "train_sets": None},
+    "with_n_words": {"drop": [], "train_sets": None},
+    "english_only": {"drop": list(EXCLUDED_FEATURES), "train_sets": ENGLISH_SETS},
 }
 
 

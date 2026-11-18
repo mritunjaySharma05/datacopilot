@@ -131,3 +131,8 @@ def test_predict_answerable_uses_bundle_features_and_threshold():
     assert ok is True and 0.5 <= prob <= 1
     never = {**bundle, "threshold": 1.01}
     assert ans.predict_answerable("What is the production of each crop?", schema, ctx, never)[0] is False
+
+
+def test_deployed_features_leave_out_n_words():
+    assert "n_words" in ans.EXCLUDED_FEATURES
+    assert ans.DEPLOYED_FEATURES == tuple(f for f in FEATURE_NAMES if f != "n_words")
