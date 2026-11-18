@@ -16,6 +16,8 @@ from collections import defaultdict
 from pathlib import Path
 
 import duckdb
+import sqlglot
+from sqlglot import exp
 
 from datacopilot.pipeline.executor import connect_sqlite, load_csv
 from datacopilot.pipeline.validator import is_read_only
@@ -189,12 +191,77 @@ def _same_values(a: list, b: list) -> bool:
     return len(a) == len(b) and all(_values_match(x, y) for x, y in zip(a, b))
 
 
-def answers_match_relaxed(expected: list[list], actual: list[list], ordered: bool) -> bool:
-    """Lenient match: every gold column appears among the predicted columns.
+def _outer_select(sql: str, dialect: str | None = None):
+    """Outermost SELECT of a query (None if it cannot be parsed or is not a SELECT)."""
+    try:
+        tree = sqlglot.parse_one(sql, read=dialect)
+    except sqlglot.errors.ParseError:
+        return None
+    return tree if isinstance(tree, exp.Select) else None
 
-    Extra predicted columns are allowed, column order may differ, and predicted numbers are
-    rounded to the gold column's precision (so AVG without ROUND still matches). Rows must
-    still match one-to-one (in order if `ordered`).
+
+def is_ranking(sql: str, dialect: str | None = None) -> bool:
+    """True if the outer query has ORDER BY and LIMIT > 1 (a ranking / top-N question).
+
+    Relaxed matching only checks row order for these; strict matching uses is_ordered.
+    """
+    select = _outer_select(sql, dialect)
+    if select is None or select.args.get("order") is None or select.args.get("limit") is None:
+        return False
+    try:
+        return int(select.args["limit"].expression.name) > 1
+    except (AttributeError, ValueError):
+        return False
+
+
+def key_columns(sql: str, dialect: str | None = None) -> list[int]:
+    """Positions of the outer SELECT columns that are not aggregates.
+
+    A column is an aggregate if its expression contains an aggregate function (COUNT, SUM,
+    AVG, ...) or refers to an alias given to an aggregate anywhere in the query (e.g. a
+    COUNT(*) AS sixes computed in a subquery, or growth computed from such aliases). Unparseable SQL: every column is a key.
+    """
+    select = _outer_select(sql, dialect)
+    if select is None:
+        return []
+    agg_aliases = {a.alias.lower() for a in select.find_all(exp.Alias) if a.this.find(exp.AggFunc)}
+    keys = []
+    for i, col in enumerate(select.expressions):
+        inner = col.this if isinstance(col, exp.Alias) else col
+        if inner.find(exp.AggFunc):
+            continue
+        if any(c.name.lower() in agg_aliases for c in inner.find_all(exp.Column)):
+            continue
+        keys.append(i)
+    return keys
+
+
+def _match_columns(gold_cols: list[list], pred_cols: list[list]) -> list[list] | None:
+    """For each gold column, the (rounded) predicted column with the same values; None if any is missing."""
+    chosen, used = [], set()
+    for col in gold_cols:
+        d = _decimals(col)
+        match = next((k for k, p in enumerate(pred_cols)
+                      if k not in used and _same_values(col, _round_column(p, d))), None)
+        if match is None:
+            return None
+        used.add(match)
+        chosen.append(_round_column(pred_cols[match], d))
+    return chosen
+
+
+def answers_match_relaxed(expected: list[list], actual: list[list], ordered: bool,
+                          keys: list[int] | None = None) -> bool:
+    """Lenient match (secondary metric; strict answers_match stays primary).
+
+    1. Every gold column appears among the predicted columns: extra predicted columns are
+       allowed, column order may differ, predicted numbers are rounded to the gold column's
+       precision (so AVG without ROUND still matches).
+    2. Otherwise, if `keys` (gold column positions that are not aggregates, see key_columns)
+       is a non-empty proper subset: the prediction has exactly the key columns, i.e. it
+       names the right rows but leaves out the count / aggregate. A prediction that has an
+       extra column (e.g. a wrong count) is not accepted by this rule.
+    Rows must match one-to-one, in order only if `ordered` (callers pass is_ranking(gold_sql)).
     """
     if len(expected) != len(actual):
         return False
@@ -202,13 +269,13 @@ def answers_match_relaxed(expected: list[list], actual: list[list], ordered: boo
         return True
     gold_cols = [list(c) for c in zip(*expected)]
     pred_cols = [list(c) for c in zip(*actual)]
-    chosen, used = [], set()
-    for col in gold_cols:
-        d = _decimals(col)
-        match = next((k for k, p in enumerate(pred_cols)
-                      if k not in used and _same_values(col, _round_column(p, d))), None)
-        if match is None:
-            return False
-        used.add(match)
-        chosen.append(_round_column(pred_cols[match], d))
-    return answers_match(expected, [list(r) for r in zip(*chosen)], ordered)
+    chosen = _match_columns(gold_cols, pred_cols)
+    if chosen is not None:
+        return answers_match(expected, [list(r) for r in zip(*chosen)], ordered)
+    if not keys or len(keys) >= len(gold_cols) or len(pred_cols) != len(keys):
+        return False
+    key_gold = [gold_cols[i] for i in keys]
+    chosen = _match_columns(key_gold, pred_cols)
+    if chosen is None:
+        return False
+    return answers_match([list(r) for r in zip(*key_gold)], [list(r) for r in zip(*chosen)], ordered)

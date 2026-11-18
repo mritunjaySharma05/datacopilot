@@ -120,3 +120,39 @@ def test_answers_match_relaxed(expected, actual, ordered, ok):
 def test_answers_match_relaxed_keeps_rows_aligned():
     # Each column matches as a multiset, but the rows pair values differently.
     assert not qs.answers_match_relaxed([["a", 1], ["b", 2]], [["a", 2], ["b", 1]], ordered=False)
+
+
+@pytest.mark.parametrize("sql, ranking", [
+    ("SELECT a, COUNT(*) AS n FROM t GROUP BY a ORDER BY n DESC LIMIT 5", True),
+    ("SELECT a, COUNT(*) AS n FROM t GROUP BY a ORDER BY n DESC LIMIT 1", False),  # one row: order irrelevant
+    ("SELECT a, COUNT(*) AS n FROM t GROUP BY a ORDER BY a", False),              # presentation order only
+    ("SELECT a FROM t LIMIT 5", False),
+    ("SELECT a FROM (SELECT a FROM t ORDER BY a LIMIT 5)", False),                 # inner ORDER BY ignored
+    ("not sql at all (", False),
+])
+def test_is_ranking(sql, ranking):
+    assert qs.is_ranking(sql) is ranking
+
+
+@pytest.mark.parametrize("sql, keys", [
+    ("SELECT a, COUNT(*) AS n FROM t GROUP BY a", [0]),
+    ("SELECT ROUND(AVG(x), 2) FROM t", []),
+    ("SELECT a, b, total FROM (SELECT a, b, SUM(x) AS total FROM t GROUP BY a, b)", [0, 1]),
+    ("WITH s AS (SELECT a, SUM(x) AS p1, SUM(y) AS p2 FROM t GROUP BY a) SELECT a, ROUND(p2 / p1, 1) AS g FROM s", [0]),
+    ("SELECT name, points FROM standings", [0, 1]),                               # stored values are keys
+])
+def test_key_columns(sql, keys):
+    assert qs.key_columns(sql) == keys
+
+
+@pytest.mark.parametrize("expected, actual, keys, ok", [
+    ([["Mumbai Indians", 160]], [["Mumbai Indians"]], [0], True),               # count left out
+    ([["Mumbai Indians", 160]], [["Chennai Super Kings"]], [0], False),         # wrong key
+    ([["Mumbai Indians", 160]], [["Mumbai Indians", 999]], [0], False),         # wrong count present
+    ([["Mumbai Indians", 160]], [["Mumbai Indians"]], None, False),             # no key info
+    ([["Mumbai Indians", 160]], [["Mumbai Indians"]], [0, 1], False),           # all columns are keys
+    ([[2002, -18604468]], [[2002, 71453399, -18604468]], [0], True),           # rule 1: extra column is fine
+    ([[2002, -18604468]], [[2002, -18604468.33]], [0], False),                # integer gold is not rounded towards
+])
+def test_answers_match_relaxed_key_columns(expected, actual, keys, ok):
+    assert qs.answers_match_relaxed(expected, actual, ordered=False, keys=keys) is ok
