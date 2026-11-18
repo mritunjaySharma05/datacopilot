@@ -1,0 +1,442 @@
+{
+  "main": {
+    "params": {
+      "clf__C": 0.1
+    },
+    "cv_macro_f1": 0.8903,
+    "test": {
+      "n": 180,
+      "accuracy": 0.9055555555555556,
+      "macro_f1": 0.9055526405135961,
+      "unanswerable_precision": 0.9010989010989011,
+      "unanswerable_recall": 0.9111111111111111,
+      "unanswerable_f1": 0.9060773480662984,
+      "confusion_matrix": [
+        [
+          82,
+          8
+        ],
+        [
+          9,
+          81
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "csv": 0.9167,
+        "hinglish": 0.8667,
+        "hinglish_unanswerable": 0.9333,
+        "unanswerable": 0.9
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.9556,
+        "f1": 0.9565,
+        "ipl": 0.7955,
+        "olist": 0.9111
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.9412,
+        "missing_column": 0.7,
+        "out_of_range": 0.9412,
+        "subjective": 1.0,
+        "write_request": 1.0
+      }
+    },
+    "heldout": {
+      "n": 30,
+      "accuracy": 0.6666666666666666,
+      "macro_f1": 0.660633484162896,
+      "unanswerable_precision": 0.631578947368421,
+      "unanswerable_recall": 0.8,
+      "unanswerable_f1": 0.7058823529411765,
+      "confusion_matrix": [
+        [
+          12,
+          3
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "heldout_en": 0.7,
+        "heldout_hinglish": 0.6
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.4286,
+        "f1": 0.875,
+        "ipl": 0.75,
+        "olist": 0.5714
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.6667,
+        "missing_column": 0.6667,
+        "out_of_range": 1.0,
+        "subjective": 0.6667,
+        "write_request": 1.0
+      }
+    },
+    "misclassified": [
+      {
+        "id": "human-002",
+        "question": "kohli ne total kitne sixes mare",
+        "dataset": "ipl",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.1724
+      },
+      {
+        "id": "human-004",
+        "question": "bumrah ki overall economy kitni hai",
+        "dataset": "ipl",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.2289
+      },
+      {
+        "id": "human-006",
+        "question": "verstappen ke 2023 mein kitne podiums the",
+        "dataset": "f1",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.3083
+      },
+      {
+        "id": "human-009",
+        "question": "avg review score?",
+        "dataset": "olist",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.431
+      },
+      {
+        "id": "human-011",
+        "question": "how many orders were paid with boleto",
+        "dataset": "olist",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.4446
+      },
+      {
+        "id": "human-013",
+        "question": "2010 me punjab ne kitna rice ugaya",
+        "dataset": "crop",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.4461
+      },
+      {
+        "id": "human-015",
+        "question": "kharif vs rabi total area",
+        "dataset": "crop",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.3122
+      },
+      {
+        "id": "human-018",
+        "question": "How much money did farmers in Bihar earn from selling their wheat in 2012, in rupees?",
+        "dataset": "crop",
+        "answerable": 0,
+        "unanswerable_type": "missing_column",
+        "p_answerable": 0.7932
+      },
+      {
+        "id": "human-023",
+        "question": "When was Olist founded and where is its head office?",
+        "dataset": "olist",
+        "answerable": 0,
+        "unanswerable_type": "external_knowledge",
+        "p_answerable": 0.5067
+      },
+      {
+        "id": "human-027",
+        "question": "Which crop should a small farmer in Rajasthan grow next year to make the most money, given how prices have moved?",
+        "dataset": "crop",
+        "answerable": 0,
+        "unanswerable_type": "subjective",
+        "p_answerable": 0.6965
+      }
+    ]
+  },
+  "logreg": {
+    "params": {
+      "clf__C": 0.1
+    },
+    "cv_macro_f1": 0.8903,
+    "test": {
+      "n": 180,
+      "accuracy": 0.9055555555555556,
+      "macro_f1": 0.9055526405135961,
+      "unanswerable_precision": 0.9010989010989011,
+      "unanswerable_recall": 0.9111111111111111,
+      "unanswerable_f1": 0.9060773480662984,
+      "confusion_matrix": [
+        [
+          82,
+          8
+        ],
+        [
+          9,
+          81
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "csv": 0.9167,
+        "hinglish": 0.8667,
+        "hinglish_unanswerable": 0.9333,
+        "unanswerable": 0.9
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.9556,
+        "f1": 0.9565,
+        "ipl": 0.7955,
+        "olist": 0.9111
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.9412,
+        "missing_column": 0.7,
+        "out_of_range": 0.9412,
+        "subjective": 1.0,
+        "write_request": 1.0
+      }
+    },
+    "heldout": {
+      "n": 30,
+      "accuracy": 0.6666666666666666,
+      "macro_f1": 0.660633484162896,
+      "unanswerable_precision": 0.631578947368421,
+      "unanswerable_recall": 0.8,
+      "unanswerable_f1": 0.7058823529411765,
+      "confusion_matrix": [
+        [
+          12,
+          3
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "heldout_en": 0.7,
+        "heldout_hinglish": 0.6
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.4286,
+        "f1": 0.875,
+        "ipl": 0.75,
+        "olist": 0.5714
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.6667,
+        "missing_column": 0.6667,
+        "out_of_range": 1.0,
+        "subjective": 0.6667,
+        "write_request": 1.0
+      }
+    },
+    "misclassified": [
+      {
+        "id": "human-002",
+        "question": "kohli ne total kitne sixes mare",
+        "dataset": "ipl",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.1724
+      },
+      {
+        "id": "human-004",
+        "question": "bumrah ki overall economy kitni hai",
+        "dataset": "ipl",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.2289
+      },
+      {
+        "id": "human-006",
+        "question": "verstappen ke 2023 mein kitne podiums the",
+        "dataset": "f1",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.3083
+      },
+      {
+        "id": "human-009",
+        "question": "avg review score?",
+        "dataset": "olist",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.431
+      },
+      {
+        "id": "human-011",
+        "question": "how many orders were paid with boleto",
+        "dataset": "olist",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.4446
+      },
+      {
+        "id": "human-013",
+        "question": "2010 me punjab ne kitna rice ugaya",
+        "dataset": "crop",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.4461
+      },
+      {
+        "id": "human-015",
+        "question": "kharif vs rabi total area",
+        "dataset": "crop",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.3122
+      },
+      {
+        "id": "human-018",
+        "question": "How much money did farmers in Bihar earn from selling their wheat in 2012, in rupees?",
+        "dataset": "crop",
+        "answerable": 0,
+        "unanswerable_type": "missing_column",
+        "p_answerable": 0.7932
+      },
+      {
+        "id": "human-023",
+        "question": "When was Olist founded and where is its head office?",
+        "dataset": "olist",
+        "answerable": 0,
+        "unanswerable_type": "external_knowledge",
+        "p_answerable": 0.5067
+      },
+      {
+        "id": "human-027",
+        "question": "Which crop should a small farmer in Rajasthan grow next year to make the most money, given how prices have moved?",
+        "dataset": "crop",
+        "answerable": 0,
+        "unanswerable_type": "subjective",
+        "p_answerable": 0.6965
+      }
+    ]
+  },
+  "logreg_no_nwords": {
+    "params": {
+      "clf__C": 0.1
+    },
+    "cv_macro_f1": 0.8688,
+    "test": {
+      "n": 180,
+      "accuracy": 0.9,
+      "macro_f1": 0.9,
+      "unanswerable_precision": 0.9,
+      "unanswerable_recall": 0.9,
+      "unanswerable_f1": 0.9,
+      "confusion_matrix": [
+        [
+          81,
+          9
+        ],
+        [
+          9,
+          81
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "csv": 0.9,
+        "hinglish": 0.9,
+        "hinglish_unanswerable": 0.9333,
+        "unanswerable": 0.8833
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.8889,
+        "f1": 0.9565,
+        "ipl": 0.8182,
+        "olist": 0.9333
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 0.9412,
+        "missing_column": 0.65,
+        "out_of_range": 0.9412,
+        "subjective": 1.0,
+        "write_request": 1.0
+      }
+    },
+    "heldout": {
+      "n": 30,
+      "accuracy": 0.8333333333333334,
+      "macro_f1": 0.8331479421579533,
+      "unanswerable_precision": 0.8125,
+      "unanswerable_recall": 0.8666666666666667,
+      "unanswerable_f1": 0.8387096774193549,
+      "confusion_matrix": [
+        [
+          13,
+          2
+        ],
+        [
+          3,
+          12
+        ]
+      ],
+      "accuracy_by_question_set": {
+        "heldout_en": 0.9,
+        "heldout_hinglish": 0.7
+      },
+      "accuracy_by_dataset": {
+        "crop": 0.8571,
+        "f1": 0.875,
+        "ipl": 0.75,
+        "olist": 0.8571
+      },
+      "recall_by_unanswerable_type": {
+        "external_knowledge": 1.0,
+        "missing_column": 0.3333,
+        "out_of_range": 1.0,
+        "subjective": 1.0,
+        "write_request": 1.0
+      }
+    },
+    "misclassified": [
+      {
+        "id": "human-002",
+        "question": "kohli ne total kitne sixes mare",
+        "dataset": "ipl",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.2447
+      },
+      {
+        "id": "human-004",
+        "question": "bumrah ki overall economy kitni hai",
+        "dataset": "ipl",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.2466
+      },
+      {
+        "id": "human-006",
+        "question": "verstappen ke 2023 mein kitne podiums the",
+        "dataset": "f1",
+        "answerable": 1,
+        "unanswerable_type": NaN,
+        "p_answerable": 0.3647
+      },
+      {
+        "id": "human-016",
+        "question": "how many customers are female",
+        "dataset": "olist",
+        "answerable": 0,
+        "unanswerable_type": "missing_column",
+        "p_answerable": 0.6534
+      },
+      {
+        "id": "human-018",
+        "question": "How much money did farmers in Bihar earn from selling their wheat in 2012, in rupees?",
+        "dataset": "crop",
+        "answerable": 0,
+        "unanswerable_type": "missing_column",
+        "p_answerable": 0.596
+      }
+    ]
+  }
+}
