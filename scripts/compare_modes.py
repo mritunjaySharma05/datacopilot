@@ -89,7 +89,7 @@ def section(title: str, paired: pd.DataFrame) -> list[str]:
                   "|---|---|---|---|---|---|"]
         for grp, r in t.iterrows():
             name = f"**{grp}**" if grp == "all" else grp
-            lines.append(f"| {name} | {r.n} | {_pct(r.strict_v)} | {_pct(r.strict_b)} | "
+            lines.append(f"| {name} | {int(r.n)} | {_pct(r.strict_v)} | {_pct(r.strict_b)} | "
                          f"{_pct(r.relaxed_v)} | {_pct(r.relaxed_b)} |")
         lines.append("")
     lines += ["### McNemar's test (exact, two-sided)", "",

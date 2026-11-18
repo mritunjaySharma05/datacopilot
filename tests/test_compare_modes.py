@@ -62,6 +62,7 @@ def test_disagreements_on_either_metric():
 def test_report_sections():
     text = cm.report({"Test": cm.pair_runs(V, B)})
     assert "## Test (4 questions)" in text and "### McNemar's test" in text
+    assert "| **all** | 4 | 75.0% | 50.0% | 100.0% | 50.0% |" in text
     assert "| crop-002 | q crop-002? | correct | wrong | wrong_result |" in text
     assert "| f1-001 | q f1-001? | relaxed only | wrong | wrong_result |" in text
 
