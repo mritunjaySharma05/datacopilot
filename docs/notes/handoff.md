@@ -256,7 +256,8 @@ Goal (milestones): **answerability classifier + baseline vs validated pipeline e
      using `datacopilot.questions.answers_match`.
    - Olist uses dialect `sqlite` on `olist.sqlite`; others `duckdb` on processed CSVs
      (`datacopilot.questions.connect` already does this).
-4. **Answerability gate experiment:** classifier first; if "unanswerable", refuse instead of
+4. **DONE 2026-11-18 (`docs/results/gate.md`: end-to-end strict 28.9% to 57.8% on test,
+   12 false refusals, McNemar p < 0.0001).** **Answerability gate experiment:** classifier first; if "unanswerable", refuse instead of
    generating SQL. Measure correct refusals on the unanswerable sets and false refusals on
    answerable ones, and end-to-end accuracy with vs without the gate.
 5. **BIRD:** rerun `eval_bird.py` on a larger agreed subset in both modes (decision 4).
