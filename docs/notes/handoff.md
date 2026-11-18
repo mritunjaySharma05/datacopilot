@@ -1,4 +1,4 @@
-# Handoff: DataCopilot, state as of 2026-11-17
+# Handoff: DataCopilot, state as of 2026-11-18
 
 For a fresh Claude Code session on a new machine (MacBook M2, 16 GB). Read this first,
 then `README.md`, `data/questions/README.md` and `data/features/README.md`.
@@ -114,6 +114,9 @@ blindly rebuild answers: diff first, then decide.
   **validated 7/10, baseline 6/10** (2026-11-11). Smoke test only, not a benchmark.
 - Question sets: 200 English answerable, 100 Hinglish answerable, 200 English
   unanswerable, 100 Hinglish unanswerable (50 added 2026-11-17); 70/30 train/test (seed 42).
+- Human held-out set: 30 questions (`human_heldout.jsonl`, AI-drafted, human-edited,
+  split "heldout", evaluation only). Classifier: 90.6% on test but 66.7% on held-out;
+  without `n_words` 90.0% / 83.3% (`docs/results/README.md`).
 - Features: 600 rows x 24 features. Strongest train-split signals: `schema_overlap`
   (0.54 answerable vs 0.29 unanswerable), `unmatched_share`, write-verb / imperative,
   opinion and external-cue counts, out-of-range years, unmatched entities.
@@ -204,8 +207,9 @@ blindly rebuild answers: diff first, then decide.
 
 1. ~~Hinglish class balance~~ Resolved 2026-11-17: 50 Hinglish unanswerable questions
    added (100 total, 5 per dataset x type).
-2. ~~`n_words`~~ Resolved 2026-11-17: kept in the main model; "without n_words" reported
-   as an ablation.
+2. **`n_words` (reopened 2026-11-18):** kept in the main model on 2026-11-17 with a
+   "without n_words" ablation. On the human held-out set the fair logreg ablation scores
+   66.7% with it vs 83.3% without (test: 90.6% vs 90.0%). Drop it from the deployed model?
 3. ~~Module 3 status in `docs/planning/milestones.md`~~ Resolved 2026-11-15: Module 3
    "Submitted", Module 4 "In progress".
 4. ~~BIRD scale~~ Resolved 2026-11-17: fixed-seed sample of 300 dev questions stratified
