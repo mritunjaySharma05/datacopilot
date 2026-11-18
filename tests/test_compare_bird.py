@@ -54,6 +54,7 @@ def test_report_has_mcnemar_and_disagreements():
     assert "| 1 | shop | moderate | validated | execution_failed | correct |" in text
     assert "| 3 | zoo | challenging | baseline | correct | wrong_result |" in text
     assert "| shop | 2 | 100.0% | 50.0% | +50.0 pts |" in text
+    assert "| execution_failed | 1 | 0 |" in text  # baseline crash fixed by validated retry
 
 
 def test_newest(tmp_path):

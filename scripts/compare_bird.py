@@ -91,6 +91,10 @@ def report(paired: pd.DataFrame, title: str) -> str:
                            "baseline": paired.outcome_b.value_counts()}).fillna(0).astype(int)
     lines += ["## Outcomes", "", "| outcome | validated | baseline |", "|---|---|---|"]
     lines += [f"| {o} | {r.validated} | {r.baseline} |" for o, r in counts.iterrows()]
+    x = pd.crosstab(paired.outcome_b, paired.outcome_v)
+    lines += ["", "## Baseline outcome (rows) vs validated outcome (columns)", "",
+              "| baseline \\ validated | " + " | ".join(x.columns) + " |", "|---" * (len(x.columns) + 1) + "|"]
+    lines += [f"| {o} | " + " | ".join(str(v) for v in r) + " |" for o, r in x.iterrows()]
     d = paired[paired.correct_v != paired.correct_b].sort_values("question_id")
     lines += ["", f"## Questions where the modes disagree ({len(d)})", "",
               "| question_id | database | difficulty | right in | baseline outcome | validated outcome |",
