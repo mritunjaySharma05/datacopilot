@@ -79,8 +79,9 @@ questions (60 English, 30 Hinglish); human held-out = its 15 answerable question
   wrong answer, which a schema check cannot catch. On BIRD (smoke test, 10 questions)
   validation gained one question; step 5 measures this at scale.
 - **Hinglish is lower** (26.7% vs 36.7% English strict); F1 is the weakest dataset (13.0%),
-  e.g. counting cancelled races, summing standings across rounds instead of using the
-  latest standings, or podiums from all sessions instead of races only.
+  e.g. counting a cancelled race (f1-019), summing cumulative standings across rounds
+  instead of taking the latest (f1-011), or counting top-3 championship positions after
+  each round as podiums instead of race results (f1-025).
 - **Measurement caveats (metric unchanged; decision pending):**
   - 2 test questions (ipl-028, crop-011) fail relaxed matching only because of row order:
     the gold SQL has an outer `ORDER BY` for presentation, so order counts even when the
