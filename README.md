@@ -21,7 +21,7 @@ AI data tools often run LLM-generated queries without checking them, which can r
 | SQLite / PostgreSQL connection | Planned |
 | English + Hinglish questions | Planned |
 | Automatic dataset insights | Planned |
-| Answerability classifier | Planned |
+| Answerability classifier | Done |
 | SQL validation (schema + read-only) | Started |
 | Auto chart selection (Plotly) | Planned |
 | Cloud deployment (Docker, AWS/GCP) | Planned |
