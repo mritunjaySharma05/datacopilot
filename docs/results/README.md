@@ -2,6 +2,8 @@
 
 | File | Made by | Content |
 |---|---|---|
+| `module4_summary.md` | hand-written | One-page summary: key numbers, McNemar results, findings, limitations |
+| `figures/*.png` | `scripts/make_figures.py` | Report figures: answerability, gate, our sets by dataset, BIRD by difficulty |
 | `answerability.md`, `answerability_metrics.json` | `scripts/train_answerability.py` | Classifier selection (CV on train), test-split scores, ablations |
 | `heldout.md`, `heldout_metrics.json` | `scripts/eval_heldout.py` | Scores on the 30-question human held-out set, fair `n_words` ablation, every misclassified question |
 | `questions_test.md`, `questions_heldout.md` | `scripts/eval_questions.py --report ...` | SQL pipeline accuracy on our answerable questions (test split; held-out answerable 15), validated and baseline |
