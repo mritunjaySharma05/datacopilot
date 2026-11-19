@@ -42,6 +42,20 @@ Python · Pandas · DuckDB · SQLite / PostgreSQL · SQLAlchemy · scikit-learn 
 - Custom CSV, Hinglish, and unanswerable question sets
 - Main comparison: baseline LLM pipeline vs validated pipeline (wrong-answer rate, execution accuracy, correct refusals)
 
+## Project status
+
+Modules 1–3 submitted. Module 4 (answerability classifier + baseline vs validated experiments) report done: [DataCopilot_Module4_Submission.pdf](docs/reports/DataCopilot_Module4_Submission.pdf). Progress per module: [docs/planning/milestones.md](docs/planning/milestones.md).
+
+## Module 4 results
+
+- **Answerability classifier:** XGBoost on 23 hand-made features; **87.2%** accuracy on the test split, **86.7%** on a human held-out set.
+- **Answerability gate:** unanswerable questions given an invented answer drop from **68 to 10** (of 90); end-to-end accuracy rises from **28.9% to 57.8%** (exact McNemar p < 0.0001).
+- **BIRD** (300-question dev sample): validated **52.3%** vs baseline **51.0%**, not significant (p = 0.125).
+
+![Answerability gate](docs/results/figures/gate.png)
+
+More: [report (PDF)](docs/reports/DataCopilot_Module4_Submission.pdf) · [one-page summary](docs/results/module4_summary.md) · [model card](docs/results/MODEL_CARD.md) · [notebook](notebooks/module4_model_development.ipynb) · [figures](docs/results/figures/)
+
 ## Project structure
 
 ```
