@@ -5,7 +5,7 @@ sqlglot validator checks it; the database computes every number. Module 4 asks t
 questions: **(1) can a small classifier tell answerable from unanswerable questions before
 any SQL is written, and (2) does schema validation with one retry make the SQL more
 accurate?** Details in `README.md` (notes) and the generated reports beside it; figures in
-`figures/` (made by `scripts/make_figures.py`).
+`figures/` (made by `scripts/make_figures.py`); the deployed classifier is documented in `MODEL_CARD.md`.
 
 ## Key numbers
 
