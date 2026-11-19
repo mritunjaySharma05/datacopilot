@@ -61,3 +61,65 @@ def test_plots_write_pngs(tmp_path):
              mf.plot_bird(mf.bird_data(PAIRED), tmp_path / "b.png")]
     for p in paths:
         assert p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+# ---------- classifier figures ----------
+
+class Fixed:
+    """Fake model: P(answerable) taken from the table's 'p' column."""
+
+    def __init__(self, table):
+        self.table = table
+
+    def predict_proba(self, X):
+        import numpy as np
+        p = self.table.loc[X.index, "p"].to_numpy()
+        return np.column_stack([1 - p, p])
+
+
+FEATS = pd.DataFrame({"split": ["train", "test", "test", "test", "test"], "answerable": [1, 1, 1, 0, 0],
+                      "f": [0, 1, 2, 3, 4], "p": [0.5, 0.9, 0.4, 0.3, 0.6]})
+BUNDLE = {"model": Fixed(FEATS), "feature_names": ["f"], "threshold": 0.5}
+FAMILIES = {"xgboost": {"cv_macro_f1": 0.88, "cv_std": 0.03, "test_macro_f1": 0.87},
+            "logreg": {"cv_macro_f1": 0.86, "cv_std": 0.05, "test_macro_f1": 0.9}}
+
+
+def test_confusion_data_labels_rows_true_columns_predicted():
+    t = mf.confusion_data({"confusion_matrix": [[79, 11], [12, 78]]})
+    assert t.loc["Unanswerable", "Answerable"] == 11 and t.loc["Answerable", "Unanswerable"] == 12
+
+
+def test_test_scores_use_test_rows_and_unanswerable_as_positive():
+    y, s = mf.test_scores(BUNDLE, FEATS)
+    assert y.tolist() == [0, 0, 1, 1]
+    assert s.tolist() == pytest.approx([0.1, 0.6, 0.7, 0.4])
+    with pytest.raises(ValueError):
+        mf.test_scores(BUNDLE, FEATS[FEATS.split == "train"])
+
+
+def test_curve_data_auc_ap_and_operating_point():
+    c = mf.curve_data(*mf.test_scores(BUNDLE, FEATS))
+    assert c["auc"] == pytest.approx(0.75)  # 3 of 4 (unanswerable, answerable) pairs ranked right
+    assert 0 < c["ap"] <= 1 and c["base_rate"] == 0.5
+    # refused (P < 0.5): rows with p 0.4 (answerable) and 0.3 (unanswerable)
+    assert c["point"] == {"fpr": 0.5, "tpr": 0.5, "precision": 0.5}
+
+
+def test_importance_data_top_n_by_absolute_value():
+    w = mf.importance_data({"a": 0.1, "b": -0.5, "c": 0.3}, top=2)
+    assert w.index.tolist() == ["b", "c"]
+
+
+def test_family_data_order_and_columns():
+    t = mf.family_data(FAMILIES)
+    assert t.index.tolist() == ["Logistic regression", "XGBoost"]
+    assert t.loc["XGBoost", "Test macro F1"] == 0.87 and t.loc["Logistic regression", "cv_std"] == 0.05
+
+
+def test_classifier_plots_write_pngs(tmp_path):
+    paths = [mf.plot_confusion(mf.confusion_data({"confusion_matrix": [[3, 1], [1, 3]]}), tmp_path / "c.png", "t"),
+             mf.plot_curves(mf.curve_data(*mf.test_scores(BUNDLE, FEATS)), tmp_path / "r.png"),
+             mf.plot_importance(mf.importance_data({"a": 0.2, "b": 0.1}), tmp_path / "i.png"),
+             mf.plot_families(mf.family_data(FAMILIES), tmp_path / "f.png")]
+    for p in paths:
+        assert p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
