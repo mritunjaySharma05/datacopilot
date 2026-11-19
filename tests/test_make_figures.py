@@ -123,3 +123,11 @@ def test_classifier_plots_write_pngs(tmp_path):
              mf.plot_families(mf.family_data(FAMILIES), tmp_path / "f.png")]
     for p in paths:
         assert p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_main_skips_figures_whose_runs_are_missing(tmp_path, capsys):
+    assert mf.main(["--results-dir", str(tmp_path / "no_runs"), "--out-dir", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert "Skipped gate" in out and "Skipped BIRD" in out
+    assert {p.name for p in tmp_path.glob("*.png")} == {"answerability.png", "confusion_matrix.png", "roc_pr.png",
+                                                       "feature_importance.png", "model_families.png"}

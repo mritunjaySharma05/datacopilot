@@ -335,18 +335,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
     parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
     args = parser.parse_args(argv)
-    metrics = json.loads((RESULTS_DOCS / "heldout_metrics.json").read_text(encoding="utf-8"))
-    gate = pd.read_csv(eval_gate.newest("gate_test_*.csv", args.results_dir))
-    ours = pd.read_csv(eval_gate.newest("questions_validated_csv+hinglish_test_*_rescored.csv", args.results_dir))
-    paired = compare_bird.pair_runs(*(pd.read_csv(compare_bird.newest(args.results_dir, m, compare_bird.DEFAULT_TAG))
-                                      for m in ("validated", "baseline")))
-    for p in (plot_answerability(answerability_data(metrics), args.out_dir / "answerability.png"),
-              plot_gate(gate_data(gate), args.out_dir / "gate.png"),
-              plot_our_sets(our_sets_data(ours), args.out_dir / "our_sets.png"),
-              plot_bird(bird_data(paired), args.out_dir / "bird.png")):
-        print(f"Wrote {p}")
-    for p in classifier_figures(args.out_dir):
-        print(f"Wrote {p}")
+    groups = {
+        "answerability": lambda: [plot_answerability(answerability_data(json.loads(
+            (RESULTS_DOCS / "heldout_metrics.json").read_text(encoding="utf-8"))), args.out_dir / "answerability.png")],
+        "gate": lambda: [plot_gate(gate_data(pd.read_csv(eval_gate.newest("gate_test_*.csv", args.results_dir))),
+                                   args.out_dir / "gate.png")],
+        "our sets": lambda: [plot_our_sets(our_sets_data(pd.read_csv(eval_gate.newest(
+            "questions_validated_csv+hinglish_test_*_rescored.csv", args.results_dir))), args.out_dir / "our_sets.png")],
+        "BIRD": lambda: [plot_bird(bird_data(compare_bird.pair_runs(*(
+            pd.read_csv(compare_bird.newest(args.results_dir, m, compare_bird.DEFAULT_TAG))
+            for m in ("validated", "baseline")))), args.out_dir / "bird.png")],
+        "classifier": lambda: classifier_figures(args.out_dir),
+    }
+    for name, make in groups.items():
+        try:
+            for p in make():
+                print(f"Wrote {p}")
+        except FileNotFoundError as e:  # e.g. data/results runs not present on this machine
+            print(f"Skipped {name} figure(s): {e}")
     return 0
 
 
