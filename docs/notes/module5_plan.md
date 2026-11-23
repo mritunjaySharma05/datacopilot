@@ -111,11 +111,26 @@ libraries), UI 813 MB.
 
 ## 7. Open points
 
-- **Groq model**: choose from Groq's current model list when step 2 is live-tested
-  (configurable via `GROQ_MODEL`). Groq results will differ from the Module 4 Ollama numbers;
-  if they are reported, rerun the evaluation with Groq rather than reusing Ollama numbers.
-- **Groq free-plan limits** (requests and tokens per minute / day): the API must return a
-  clear error on HTTP 429 rather than a stack trace.
+- **Groq model: `openai/gpt-oss-120b`** (decided 2026-11-23). Text models available to the key:
+  `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Compared on 24 **train-split**
+  questions (6 per dataset, 7 Hinglish; no test or held-out rows), same prompt and validator:
+
+  | Model | Strict | Relaxed | Failed SQL |
+  |---|---|---|---|
+  | openai/gpt-oss-20b | 12/24 | 17/24 | 0 |
+  | openai/gpt-oss-120b | 11/24 | 17/24 | 0 |
+  | qwen/qwen3.8-27b | 10/24 | 16/24 | 0 |
+  | Ollama qwen2.5-coder:7b (Module 4) | 10/24 | 11/24 | 2 |
+
+  The two gpt-oss models differ by one question (noise at n = 24); 120b was chosen as the larger
+  model of the same family with the same limits. Groq answers take about 1-2 s per question in
+  Docker vs 10-18 s for local Ollama. Module 4 numbers are Ollama numbers; if Groq results are
+  reported, rerun the evaluation with Groq.
+- **Groq free-plan limits** (from the API's rate-limit headers): **8,000 tokens per minute and
+  1,000 requests per day, per model**. Prompts are about 200-1,350 tokens (schema included) and
+  the gpt-oss models also spend tokens on hidden reasoning, so a burst of a few questions per
+  minute hits HTTP 429; the API returns 429 with Retry-After and the UI shows the message.
+  Enough for a demo, not for many simultaneous users.
 - **Question data sent to Groq**: the prompt contains the schema and up to 3 sample values
   per column; the project's public datasets are fine, but user uploads (later) would leave
   the server. State this in the user guide.
