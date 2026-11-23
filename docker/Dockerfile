@@ -34,7 +34,8 @@ USER app
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
-CMD ["uvicorn", "datacopilot.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: every /ask writes its own JSON line (request_log.py); health checks stay quiet
+CMD ["uvicorn", "datacopilot.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 
 # ---------- UI: Streamlit, talks to the API over HTTP ----------
 FROM base AS ui

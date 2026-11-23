@@ -3,17 +3,19 @@
 Run locally:
     uvicorn datacopilot.api.main:app --reload --app-dir src
 """
+import time
 from functools import lru_cache
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from datacopilot import service
+from datacopilot import request_log, service
 from datacopilot.pipeline.llm import LLMError, LLMRateLimitError, describe, get_provider
 
 app = FastAPI(title="DataCopilot", version="0.5.0")
+logger = request_log.configure()
 
 
 class AskRequest(BaseModel):
@@ -46,21 +48,32 @@ def datasets() -> list[dict]:
 
 @app.post("/ask")
 def ask(req: AskRequest):
-    """Answer a question about one dataset (status answered / refused / failed)."""
+    """Answer a question about one dataset (status answered / refused / failed); logs one JSON line."""
+    start = time.perf_counter()
+    result, status, error, headers = None, 200, None, None
     try:
-        return service.ask(get_store(), req.dataset, req.question)
+        result = service.ask(get_store(), req.dataset, req.question)
     except service.UnknownDatasetError:
-        raise HTTPException(404, f"Unknown dataset {req.dataset!r}")
+        status, error = 404, f"Unknown dataset {req.dataset!r}"
     except service.DatasetUnavailableError as err:
-        raise HTTPException(503, str(err))
+        status, error = 503, str(err)
     except service.QuestionError as err:
-        raise HTTPException(422, str(err))
+        status, error = 422, str(err)
     except LLMRateLimitError as err:
+        status, error = 429, str(err)
         headers = {"Retry-After": f"{err.retry_after_s:.0f}"} if err.retry_after_s is not None else None
-        return JSONResponse({"detail": str(err)}, status_code=429, headers=headers)
     except LLMError as err:
-        raise HTTPException(503, str(err))
+        status, error = 503, str(err)
     except (requests.ConnectionError, requests.Timeout):
-        raise HTTPException(503, "The LLM service is unreachable (check OLLAMA_HOST or the network).")
+        status, error = 503, "The LLM service is unreachable (check OLLAMA_HOST or the network)."
     except requests.HTTPError as err:
-        raise HTTPException(502, f"The LLM service returned an error: {err}")
+        status, error = 502, f"The LLM service returned an error: {err}"
+    except Exception as err:  # log unexpected failures too, then return a plain 500
+        status, error = 500, f"Internal error ({type(err).__name__})"
+        logger.exception("ask_unhandled", extra={"dataset": req.dataset, "question": req.question})
+    request_log.log_ask(logger, request_log.ask_record(
+        result, dataset=req.dataset, question=req.question, http_status=status, error=error,
+        latency_ms=round(1000 * (time.perf_counter() - start), 1)))
+    if status != 200:
+        return JSONResponse({"detail": request_log.redact(error)}, status_code=status, headers=headers)
+    return result
