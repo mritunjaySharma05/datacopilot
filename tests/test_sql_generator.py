@@ -1,6 +1,5 @@
-from unittest.mock import MagicMock
-
 import pytest
+import requests
 
 from datacopilot.pipeline import sql_generator
 from datacopilot.pipeline.sql_generator import build_prompt, extract_sql, generate_sql
@@ -50,55 +49,44 @@ def test_build_prompt_includes_feedback(schema):
     assert "rejected: Unknown columns: price." in prompt
 
 
-# --- _call_ollama (HTTP mocked) ---
+# --- generate_sql (fake provider; HTTP providers are tested in test_llm.py) ---
 
-def test_call_ollama_uses_env_and_temperature_zero(monkeypatch):
-    monkeypatch.setenv("OLLAMA_HOST", "http://ollama.test:1234/")
-    monkeypatch.setenv("OLLAMA_MODEL", "test-model")
-    response = MagicMock()
-    response.json.return_value = {"response": "SELECT 1"}
-    post = MagicMock(return_value=response)
-    monkeypatch.setattr(sql_generator.requests, "post", post)
+class FakeProvider:
+    """Records prompts and returns canned replies."""
 
-    assert sql_generator._call_ollama("hello") == "SELECT 1"
+    name, model = "fake", "fake-model"
 
-    url = post.call_args.args[0]
-    body = post.call_args.kwargs["json"]
-    assert url == "http://ollama.test:1234/api/generate"
-    assert body["model"] == "test-model"
-    assert body["options"]["temperature"] == 0
-    assert body["stream"] is False
+    def __init__(self, reply="SELECT 1", error=None):
+        self.reply, self.error, self.prompts = reply, error, []
+
+    def complete(self, prompt):
+        self.prompts.append(prompt)
+        if self.error:
+            raise self.error
+        return self.reply
 
 
-# --- generate_sql (Ollama mocked) ---
-
-def test_generate_sql_returns_extracted_sql(monkeypatch, schema):
-    monkeypatch.setattr(
-        sql_generator, "_call_ollama",
-        lambda prompt: "```sql\nSELECT SUM(revenue) FROM sales\n```\nExplanation...",
-    )
-    assert generate_sql("Total revenue?", schema) == "SELECT SUM(revenue) FROM sales"
+def test_generate_sql_returns_extracted_sql(schema):
+    fake = FakeProvider("```sql\nSELECT SUM(revenue) FROM sales\n```\nExplanation...")
+    assert generate_sql("Total revenue?", schema, provider=fake) == "SELECT SUM(revenue) FROM sales"
 
 
-def test_generate_sql_passes_feedback_into_prompt(monkeypatch, schema):
-    seen = {}
-
-    def fake(prompt):
-        seen["prompt"] = prompt
-        return "SELECT 1"
-
-    monkeypatch.setattr(sql_generator, "_call_ollama", fake)
-    generate_sql("q", schema, feedback="Unknown tables: orders.")
-    assert "Unknown tables: orders." in seen["prompt"]
+def test_generate_sql_sends_the_shared_prompt_with_feedback(schema):
+    fake = FakeProvider()
+    generate_sql("q", schema, feedback="Unknown tables: orders.", dialect="sqlite", provider=fake)
+    assert fake.prompts == [build_prompt("q", schema, "Unknown tables: orders.", None, "sqlite")]
 
 
-def test_generate_sql_propagates_http_errors(monkeypatch, schema):
-    def boom(prompt):
-        raise sql_generator.requests.ConnectionError("down")
+def test_generate_sql_propagates_provider_errors(schema):
+    fake = FakeProvider(error=requests.ConnectionError("down"))
+    with pytest.raises(requests.ConnectionError):
+        generate_sql("q", schema, provider=fake)
 
-    monkeypatch.setattr(sql_generator, "_call_ollama", boom)
-    with pytest.raises(sql_generator.requests.ConnectionError):
-        generate_sql("q", schema)
+
+def test_generate_sql_defaults_to_env_provider(monkeypatch, schema):
+    fake = FakeProvider("SELECT 2")
+    monkeypatch.setattr(sql_generator, "get_provider", lambda: fake)
+    assert generate_sql("q", schema) == "SELECT 2" and len(fake.prompts) == 1
 
 
 def test_build_prompt_default_dialect_is_duckdb(schema):
@@ -115,18 +103,7 @@ def test_build_prompt_without_evidence_has_no_hint(schema):
     assert "Hint:" not in build_prompt("q", schema)
 
 
-def test_call_ollama_sets_context_window(monkeypatch):
-    monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
-    response = MagicMock()
-    response.json.return_value = {"response": "SELECT 1"}
-    post = MagicMock(return_value=response)
-    monkeypatch.setattr(sql_generator.requests, "post", post)
-    sql_generator._call_ollama("hello")
-    assert post.call_args.kwargs["json"]["options"]["num_ctx"] == 4096
-
-
-def test_generate_sql_passes_evidence_and_dialect(monkeypatch, schema):
-    seen = {}
-    monkeypatch.setattr(sql_generator, "_call_ollama", lambda p: seen.setdefault("p", p) and "SELECT 1")
-    generate_sql("q", schema, evidence="hint here", dialect="sqlite")
-    assert "SQLite" in seen["p"] and "Hint: hint here" in seen["p"]
+def test_generate_sql_passes_evidence_and_dialect(schema):
+    fake = FakeProvider()
+    generate_sql("q", schema, evidence="hint here", dialect="sqlite", provider=fake)
+    assert "SQLite" in fake.prompts[0] and "Hint: hint here" in fake.prompts[0]

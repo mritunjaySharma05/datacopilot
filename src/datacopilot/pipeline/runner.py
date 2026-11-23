@@ -62,7 +62,7 @@ def answer(
 
     With the validator: generate, validate, execute; on a validation or execution error,
     retry once with that error message. Without it (baseline): one attempt, no schema
-    check, no retry. `generate` defaults to the Ollama-backed generate_sql.
+    check, no retry. `generate` defaults to generate_sql (provider from LLM_PROVIDER).
     Raises SQLAttemptError (with `.sql` set) if no attempt succeeds.
     """
     generate = generate or generate_sql

@@ -17,6 +17,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from datacopilot.pipeline.executor import load_csv  # noqa: E402
+from datacopilot.pipeline.llm import LLMError  # noqa: E402
 from datacopilot.pipeline.profiler import get_schema  # noqa: E402
 from datacopilot.pipeline.runner import SQLAttemptError, answer  # noqa: E402
 from datacopilot.pipeline.sql_generator import generate_sql  # noqa: E402
@@ -48,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
         sql, result = ask(args.csv_path, args.question)
     except requests.ConnectionError:
         print("Could not reach Ollama. Is it running? (check OLLAMA_HOST in .env)", file=sys.stderr)
+        return 1
+    except LLMError as err:
+        print(f"LLM error: {err}", file=sys.stderr)
         return 1
     except SQLAttemptError as err:
         print(f"Error: {err}\n{err.sql}", file=sys.stderr)

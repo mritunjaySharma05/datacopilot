@@ -52,3 +52,16 @@ def test_main_on_bundled_sample(monkeypatch, capsys):
 def test_main_missing_file(capsys):
     assert ask_module.main(["nope.csv", "q"]) == 1
     assert "File not found" in capsys.readouterr().err
+
+
+def test_main_reports_llm_configuration_errors(monkeypatch, tmp_path, capsys):
+    from datacopilot.pipeline.llm import LLMError
+
+    def misconfigured(q, s, **kw):
+        raise LLMError("LLM_PROVIDER=groq needs GROQ_API_KEY in the environment (.env).")
+
+    csv = tmp_path / "sales.csv"
+    csv.write_text("city,revenue\nPune,10\n")
+    monkeypatch.setattr(ask_module, "generate_sql", misconfigured)
+    assert ask_module.main([str(csv), "total revenue?"]) == 1
+    assert "GROQ_API_KEY" in capsys.readouterr().err

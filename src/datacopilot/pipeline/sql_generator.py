@@ -1,19 +1,13 @@
-"""SQL generator: ask a local Ollama model to turn a question into SQL (DuckDB or SQLite)."""
-import os
+"""SQL generator: ask the configured LLM (Ollama or Groq, see llm.py) to turn a question into SQL."""
 import re
 
-import requests
 from dotenv import load_dotenv
 
+from datacopilot.pipeline.llm import LLMProvider, get_provider
 from datacopilot.pipeline.profiler import format_schema
 
 load_dotenv()
 
-DEFAULT_HOST = "http://localhost:11434"
-DEFAULT_MODEL = "qwen2.5-coder:7b"
-REQUEST_TIMEOUT_S = 120
-# Ollama's default context window is small; wide schemas would be silently truncated.
-DEFAULT_NUM_CTX = 8192
 DIALECT_NAMES = {"duckdb": "DuckDB", "sqlite": "SQLite"}
 
 PROMPT_TEMPLATE = """You write {dialect} SQL for data analysis.
@@ -74,32 +68,17 @@ def extract_sql(text: str) -> str:
     return sql.strip().rstrip(";").strip()
 
 
-def _call_ollama(prompt: str) -> str:
-    """Send `prompt` to Ollama with temperature 0 and return the raw reply text."""
-    num_ctx = int(os.getenv("OLLAMA_NUM_CTX", DEFAULT_NUM_CTX))
-    host = os.getenv("OLLAMA_HOST", DEFAULT_HOST).rstrip("/")
-    model = os.getenv("OLLAMA_MODEL", DEFAULT_MODEL)
-    response = requests.post(
-        f"{host}/api/generate",
-        json={
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0, "num_ctx": num_ctx},
-        },
-        timeout=REQUEST_TIMEOUT_S,
-    )
-    response.raise_for_status()
-    return response.json()["response"]
-
-
 def generate_sql(
     question: str,
     schema: dict,
     feedback: str | None = None,
     evidence: str | None = None,
     dialect: str = "duckdb",
+    provider: LLMProvider | None = None,
 ) -> str:
-    """Return one SQL query answering `question` over `schema`."""
+    """Return one SQL query answering `question` over `schema`.
+
+    `provider` defaults to the one selected by LLM_PROVIDER (llm.get_provider()).
+    """
     prompt = build_prompt(question, schema, feedback, evidence, dialect)
-    return extract_sql(_call_ollama(prompt))
+    return extract_sql((provider or get_provider()).complete(prompt))
