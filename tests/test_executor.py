@@ -92,3 +92,14 @@ def test_connect_sqlite_timeout_interrupts_long_query(tiny_sqlite):
 
 def test_run_query_limit_none_returns_everything(conn):
     assert len(run_query(conn, "SELECT * FROM range(2500)", limit=None)) == 2500
+
+
+def test_connect_sqlite_can_be_shared_across_threads(tiny_sqlite):
+    import threading
+    con = connect_sqlite(tiny_sqlite, check_same_thread=False)
+    out = {}
+    t = threading.Thread(target=lambda: out.setdefault("n", con.execute("SELECT 1").fetchone()[0]))
+    t.start()
+    t.join()
+    con.close()
+    assert out["n"] == 1

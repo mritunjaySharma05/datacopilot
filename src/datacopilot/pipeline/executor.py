@@ -55,16 +55,21 @@ class _TimeoutConnection(sqlite3.Connection):
             raise
 
 
-def connect_sqlite(path: str | Path, timeout_s: float | None = None) -> sqlite3.Connection:
+def connect_sqlite(
+    path: str | Path, timeout_s: float | None = None, check_same_thread: bool = True
+) -> sqlite3.Connection:
     """Open a SQLite file read-only (writes fail at the database level).
 
     If `timeout_s` is set, each statement is interrupted after that many seconds.
+    `check_same_thread=False` lets a server share the connection across worker threads;
+    the caller must then serialise access (e.g. with a lock).
     """
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"SQLite database not found: {path}")
     conn = sqlite3.connect(
-        f"{path.resolve().as_uri()}?mode=ro", uri=True, factory=_TimeoutConnection
+        f"{path.resolve().as_uri()}?mode=ro", uri=True, factory=_TimeoutConnection,
+        check_same_thread=check_same_thread,
     )
     conn.timeout_s = timeout_s
     return conn

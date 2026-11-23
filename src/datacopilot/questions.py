@@ -51,10 +51,14 @@ DIALECT = {"olist": "sqlite", "ipl": "duckdb", "f1": "duckdb", "crop": "duckdb"}
 CSV_GLOB = {"ipl": "ipl_*.csv", "f1": "f1_*.csv", "crop": "crop_production.csv"}
 
 
-def connect(dataset: str, processed_dir: Path = PROCESSED_DIR):
-    """Read-only connection with the dataset's processed tables."""
+def connect(dataset: str, processed_dir: Path = PROCESSED_DIR, check_same_thread: bool = True):
+    """Read-only connection with the dataset's processed tables.
+
+    `check_same_thread=False` (SQLite only) is for servers that share one connection across
+    threads behind a lock; DuckDB connections have no such check.
+    """
     if dataset == "olist":
-        return connect_sqlite(processed_dir / "olist.sqlite", timeout_s=60)
+        return connect_sqlite(processed_dir / "olist.sqlite", timeout_s=60, check_same_thread=check_same_thread)
     conn = duckdb.connect()
     paths = sorted(processed_dir.glob(CSV_GLOB[dataset]))
     if not paths:
