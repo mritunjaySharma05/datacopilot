@@ -1,0 +1,45 @@
+# Run DataCopilot locally: API + UI in Docker, Ollama on the host (Mac GPU).
+#   docker compose up --build        then open http://localhost:8501
+# Needs data/processed/ (scripts/prepare_data.py) and, for LLM_PROVIDER=ollama, Ollama on the host.
+# Settings and keys come from .env at run time via ${...} below (never baked into the images).
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: api
+    image: datacopilot-api:local
+    # Only the settings the API needs, read from .env by Compose (other keys in .env stay out
+    # of the container). Inside a container "localhost" is the container itself, so Ollama on
+    # the host is reached at host.docker.internal.
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:7b}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-}
+      DATA_DIR: /data
+    volumes:
+      - ./data/processed:/data:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # needed on Linux; Docker Desktop has it built in
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: ui
+    image: datacopilot-ui:local
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

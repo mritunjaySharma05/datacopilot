@@ -1,0 +1,22 @@
+# Keep the build context small and secret-free: the Dockerfile copies only src/, models/ and docker/.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ipynb_checkpoints
+.DS_Store
+.claude
+data
+docs
+notebooks
+tests
+scripts
+*.sqlite
+*.duckdb
+*.db

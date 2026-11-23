@@ -1,0 +1,11 @@
+# Runtime dependencies of the API image (versions must match ../requirements.txt; checked by tests/test_docker_files.py)
+pandas==3.1.1
+numpy==2.5.4
+duckdb==2.0.0
+sqlglot==30.30.0
+scikit-learn==1.9.1
+xgboost-cpu==3.4.1  # same library without the 200 MB NVIDIA GPU dependency
+fastapi==0.163.1
+uvicorn==0.54.0
+python-dotenv==1.2.4
+requests==2.34.2
