@@ -82,15 +82,34 @@ stop or delete resources after demos.
 
 | # | Step | Done when |
 |---|---|---|
-| 1 | This plan | committed |
-| 2 | Switchable LLM provider (`ollama` default, `groq`) | tests with a fake provider pass; one live Ollama question still works |
-| 3 | FastAPI `/health`, `/ask`, `/datasets`; Streamlit UI calling the API | answers a question end to end locally, outside Docker |
-| 4 | Dockerfiles + `docker-compose.yml`; amd64 build | `docker compose up` works on the Mac; `docker buildx build --platform linux/amd64` succeeds |
-| 5 | Structured JSON request logging | every `/ask` writes one log line with gate decision, SQL and latency; a test checks no secret appears |
+| 1 | This plan | **Done** 2026-11-23 |
+| 2 | Switchable LLM provider (`ollama` default, `groq`) | **Done**: `pipeline/llm.py`; Groq not yet live-tested (needs a key) |
+| 3 | FastAPI `/health`, `/ask`, `/datasets`; Streamlit UI calling the API | **Done**: `service.py`, `api/main.py`, `ui/app.py` |
+| 4 | Dockerfiles + `docker-compose.yml`; amd64 build | **Done**: `docker/Dockerfile` (targets `api`, `ui`); amd64 API image answered a question under emulation |
+| 5 | Structured JSON request logging | **Done**: `request_log.py`; one line per `/ask`, secrets redacted |
 | 6 | AWS: account hygiene, ECR, S3 data, secret, EC2 (or Fargate), CloudWatch | public URL answers a question with Groq |
 | 7 | Login (milestone item); HTTPS | to plan after step 6 |
 
-## 6. Open points
+## 6. Running it locally
+
+```bash
+docker compose up --build            # API on :8000, UI on http://localhost:8501; Ollama on the host
+docker compose logs -f api           # one JSON line per /ask
+docker compose down
+
+# images for the cloud (x86), built on the ARM Mac:
+docker buildx build --platform linux/amd64 -f docker/Dockerfile --target api -t datacopilot-api:amd64 --load .
+docker buildx build --platform linux/amd64 -f docker/Dockerfile --target ui  -t datacopilot-ui:amd64  --load .
+```
+
+Without Docker: `uvicorn datacopilot.api.main:app --app-dir src` and
+`API_URL=http://localhost:8000 streamlit run src/datacopilot/ui/app.py`.
+
+To use Groq: set `LLM_PROVIDER=groq`, `GROQ_API_KEY` and `GROQ_MODEL` in `.env` (Compose passes
+only these settings into the API container). Images: API 848 MB (`xgboost-cpu`, no NVIDIA
+libraries), UI 813 MB.
+
+## 7. Open points
 
 - **Groq model**: choose from Groq's current model list when step 2 is live-tested
   (configurable via `GROQ_MODEL`). Groq results will differ from the Module 4 Ollama numbers;
