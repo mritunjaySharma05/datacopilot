@@ -1,6 +1,10 @@
 # Module 5 step 6: AWS deployment plan
 
-Status: **plan only, waiting for approval** (2026-11-24). Nothing billable has been created.
+Status: **deployed 2026-11-24** with `infra/deploy.sh` (approved choices: t3.small amd64; Caddy +
+DuckDNS `datacopilot.duckdns.org` + basic auth; budget $30/month). Verified: Let's Encrypt
+certificate, HTTP->HTTPS redirect, 401 without login, ports 22/8000/8501 closed, three questions
+answered through the cloud API with Groq, JSON lines in CloudWatch with no secrets in any log group.
+First attempt failed on an apostrophe in a security-group rule description (fixed in `0c45f57`).
 Region **ap-southeast-2 (Sydney)**, account 131362574091, CLI profile `default`
 (role `AccountFullAccessRole`).
 

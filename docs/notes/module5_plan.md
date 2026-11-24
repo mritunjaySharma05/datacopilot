@@ -89,8 +89,8 @@ account, and AWS closed it to new customers from 2026-04-30.
 | 3 | FastAPI `/health`, `/ask`, `/datasets`; Streamlit UI calling the API | **Done**: `service.py`, `api/main.py`, `ui/app.py` |
 | 4 | Dockerfiles + `docker-compose.yml`; amd64 build | **Done**: `docker/Dockerfile` (targets `api`, `ui`); amd64 API image answered a question under emulation |
 | 5 | Structured JSON request logging | **Done**: `request_log.py`; one line per `/ask`, secrets redacted |
-| 6 | AWS: ECR, S3 data, secret, EC2, CloudWatch (plan: `module5_aws_plan.md`, waiting for approval) | public URL answers a question with Groq |
-| 7 | Login (milestone item); HTTPS | options in `module5_aws_plan.md`; decision pending |
+| 6 | AWS: ECR, S3 data, secret, EC2, CloudWatch (`module5_aws_plan.md`, `infra/`) | **Done** 2026-11-24: https://datacopilot.duckdns.org answers with Groq |
+| 7 | Login (milestone item); HTTPS | **Done** 2026-11-24: Caddy + Let's Encrypt + basic auth (one shared login) |
 
 ## 6. Running it locally
 
