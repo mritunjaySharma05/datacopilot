@@ -30,3 +30,6 @@ data/results/*
 # Claude Code (local only)
 CLAUDE.md
 .claude/
+
+# AWS deploy (infra/deploy.sh): temporary secret files
+infra/.secrets-tmp/

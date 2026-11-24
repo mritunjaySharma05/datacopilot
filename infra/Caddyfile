@@ -1,0 +1,17 @@
+# Template rendered on the instance by bootstrap.sh into /run/datacopilot/Caddyfile.
+# __SITE_HOSTNAME__, __AUTH_USER__ and __AUTH_HASH__ (bcrypt) are filled in at start-up.
+# Caddy gets and renews the Let's Encrypt certificate itself and redirects HTTP to HTTPS.
+
+__SITE_HOSTNAME__ {
+	encode gzip
+	basic_auth {
+		__AUTH_USER__ __AUTH_HASH__
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy ui:8501
+}

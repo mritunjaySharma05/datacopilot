@@ -1,0 +1,361 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  DataCopilot demo (Module 5): one EC2 t3.small running api + ui + caddy with Docker Compose,
+  images in ECR, data and config in a private S3 bucket, secrets in SSM Parameter Store
+  (created by infra/deploy.sh), logs in CloudWatch, one alarm, a cost budget.
+  Plan and cost estimate: docs/notes/module5_aws_plan.md
+
+Parameters:
+  SiteHostname:
+    Type: String
+    Description: Public hostname served by Caddy (e.g. a DuckDNS subdomain)
+    AllowedPattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+  AlarmEmail:
+    Type: String
+    Description: Email for alarm and budget notifications
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    NoEcho: true
+  BudgetAmountUsd:
+    Type: Number
+    Default: 30
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small]
+    Description: x86 only (the images are linux/amd64)
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+Resources:
+  # ---------------------------------------------------------------- storage
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub datacopilot-${AWS::AccountId}-apse2
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt DataBucket.Arn
+              - !Sub "${DataBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  ApiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: datacopilot/api
+      EmptyOnDelete: true
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"keep last 3","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":3},"action":{"type":"expire"}}]}'
+
+  UiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: datacopilot/ui
+      EmptyOnDelete: true
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"keep last 3","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":3},"action":{"type":"expire"}}]}'
+
+  # ---------------------------------------------------------------- logs
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /datacopilot/api
+      RetentionInDays: 14
+
+  UiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /datacopilot/ui
+      RetentionInDays: 14
+
+  CaddyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /datacopilot/caddy
+      RetentionInDays: 14
+
+  # ---------------------------------------------------------------- permissions (least privilege)
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: datacopilot-instance
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: datacopilot-instance
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ListDataBucket
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt DataBucket.Arn
+              - Sid: ReadDataAndConfig
+                Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub "${DataBucket.Arn}/data/*"
+                  - !Sub "${DataBucket.Arn}/config/*"
+              - Sid: ReadOwnParameters
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/datacopilot/*"
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EcrPullOwnRepositories
+                Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchCheckLayerAvailability
+                Resource:
+                  - !GetAtt ApiRepository.Arn
+                  - !GetAtt UiRepository.Arn
+              - Sid: WriteOwnLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "${ApiLogGroup.Arn}"
+                  - !Sub "${UiLogGroup.Arn}"
+                  - !Sub "${CaddyLogGroup.Arn}"
+              - Sid: SessionManagerAndRunCommand
+                Effect: Allow
+                Action:
+                  - ssm:UpdateInstanceInformation
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                  - ec2messages:AcknowledgeMessage
+                  - ec2messages:DeleteMessage
+                  - ec2messages:FailMessage
+                  - ec2messages:GetEndpoint
+                  - ec2messages:GetMessages
+                  - ec2messages:SendReply
+                Resource: "*"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: datacopilot-instance
+      Roles: [!Ref InstanceRole]
+
+  # ---------------------------------------------------------------- network
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: datacopilot-web
+      GroupDescription: DataCopilot - HTTP and HTTPS only (no SSH; use Session Manager)
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP (Let's Encrypt challenge and redirect to HTTPS)
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS
+      Tags:
+        - Key: Name
+          Value: datacopilot-web
+
+  # ---------------------------------------------------------------- compute
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: datacopilot
+      LaunchTemplateData:
+        MetadataOptions:
+          HttpTokens: required          # IMDSv2 only
+          HttpPutResponseHopLimit: 1    # containers cannot reach instance credentials
+          HttpEndpoint: enabled
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeType: gp3
+              VolumeSize: 16
+              Encrypted: true
+              DeleteOnTermination: true
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!GetAtt WebSecurityGroup.GroupId]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: datacopilot
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # First boot only: Docker, Compose plugin (pinned, checksum-verified), swap, systemd unit.
+          # Everything else runs from s3://${DataBucket}/config/bootstrap.sh on every start.
+          set -euxo pipefail
+          dnf install -y docker
+          systemctl enable --now docker
+          mkdir -p /usr/local/lib/docker/cli-plugins
+          curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \
+            https://github.com/docker/compose/releases/download/v5.7.0/docker-compose-linux-x86_64
+          echo "7758048ad38e580f22559603312874fec8bb638d021a9e64182385fc17cc12a2  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum -c -
+          chmod 755 /usr/local/lib/docker/cli-plugins/docker-compose
+          if [ ! -f /swapfile ]; then
+            fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+            echo "/swapfile none swap sw 0 0" >> /etc/fstab
+          fi
+          mkdir -p /opt/datacopilot
+          printf 'BUCKET=%s\nAWS_REGION=%s\n' "${DataBucket}" "${AWS::Region}" > /etc/datacopilot.env
+          cat > /opt/datacopilot/run.sh <<'RUN'
+          #!/bin/bash
+          # Fetch the current bootstrap script from S3 and run it; retry until data and images exist.
+          set -uo pipefail
+          . /etc/datacopilot.env
+          for attempt in $(seq 1 90); do
+            if aws s3 cp --region "$AWS_REGION" --only-show-errors "s3://$BUCKET/config/bootstrap.sh" /opt/datacopilot/bootstrap.sh \
+               && bash /opt/datacopilot/bootstrap.sh; then
+              exit 0
+            fi
+            echo "bootstrap attempt $attempt failed; retrying in 30 s"
+            sleep 30
+          done
+          exit 1
+          RUN
+          chmod 700 /opt/datacopilot/run.sh
+          cat > /etc/systemd/system/datacopilot.service <<'UNIT'
+          [Unit]
+          Description=DataCopilot (docker compose: api, ui, caddy)
+          Requires=docker.service
+          After=docker.service network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          TimeoutStartSec=50min
+          ExecStart=/opt/datacopilot/run.sh
+          ExecStop=/bin/bash -c '. /etc/datacopilot.env; cd /opt/datacopilot && docker compose -p datacopilot --env-file site.env -f compose.aws.yml down'
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          systemctl daemon-reload
+          systemctl enable datacopilot.service
+          systemctl start --no-block datacopilot.service
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Instance
+      Tags:
+        - Key: Name
+          Value: datacopilot
+
+  # ---------------------------------------------------------------- monitoring
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: datacopilot-alarms
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+  Api5xxMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterPattern: "{ $.http_status >= 500 }"
+      MetricTransformations:
+        - MetricNamespace: DataCopilot
+          MetricName: Api5xxErrors
+          MetricValue: "1"
+          DefaultValue: 0
+
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: datacopilot-api-5xx
+      AlarmDescription: DataCopilot API returned a server error (LLM unreachable, data missing or a crash)
+      Namespace: DataCopilot
+      MetricName: Api5xxErrors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: datacopilot-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref BudgetAmountUsd
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlarmEmail}]
+        - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlarmEmail}]
+        - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlarmEmail}]
+
+Outputs:
+  InstanceId:
+    Value: !Ref Instance
+  PublicIp:
+    Value: !Ref ElasticIp
+  BucketName:
+    Value: !Ref DataBucket
+  Registry:
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
+  Url:
+    Value: !Sub "https://${SiteHostname}"

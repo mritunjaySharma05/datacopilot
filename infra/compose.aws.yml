@@ -1,0 +1,68 @@
+# DataCopilot on the EC2 instance (uploaded to s3://<bucket>/config/ by infra/deploy.sh).
+# Run by bootstrap.sh:  docker compose -p datacopilot --env-file site.env -f compose.aws.yml up -d
+# site.env (not secret) sets REGISTRY, IMAGE_TAG, GROQ_MODEL, AWS_REGION.
+# Secrets live only in /run/datacopilot (tmpfs), written at start-up from SSM Parameter Store.
+# Only caddy publishes ports; api and ui are reachable only on the compose network.
+
+x-logging: &logging
+  driver: awslogs
+  options: &logging-options
+    awslogs-region: ${AWS_REGION}
+    awslogs-create-group: "false"
+
+services:
+  api:
+    image: ${REGISTRY}/datacopilot/api:${IMAGE_TAG}
+    env_file:
+      - /run/datacopilot/api.env          # GROQ_API_KEY only
+    environment:
+      LLM_PROVIDER: groq
+      GROQ_MODEL: ${GROQ_MODEL}
+      DATA_DIR: /data
+    volumes:
+      - /opt/datacopilot/data:/data:ro
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /datacopilot/api
+        awslogs-stream: api
+    restart: unless-stopped
+
+  ui:
+    image: ${REGISTRY}/datacopilot/ui:${IMAGE_TAG}
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /datacopilot/ui
+        awslogs-stream: ui
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.11.9
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /run/datacopilot/Caddyfile:/etc/caddy/Caddyfile:ro   # rendered at start-up (holds the bcrypt hash)
+      - caddy_data:/data                                     # certificates survive restarts
+      - caddy_config:/config
+    depends_on:
+      - ui
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /datacopilot/caddy
+        awslogs-stream: caddy
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
