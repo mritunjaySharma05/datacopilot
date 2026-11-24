@@ -1,8 +1,9 @@
 # Module 5 plan: containerised app and AWS deployment
 
 Written 2026-11-23. Module 5 milestone: Docker + AWS deployment, login, logging
-(`docs/planning/milestones.md`). Decisions so far: cloud = **AWS** (free plan, Mumbai
-`ap-south-1`); hosted LLM = **Groq** free API. Order: platform-independent work first
+(`docs/planning/milestones.md`). Decisions so far: cloud = **AWS** (free plan, **Sydney
+`ap-southeast-2`**: the project account is locked to that region; the earlier Mumbai
+`ap-south-1` note was wrong, corrected 2026-11-24); hosted LLM = **Groq** free API. Order: platform-independent work first
 (steps 1-5 below), cloud only after the app runs in Docker locally.
 
 ## 1. What exists today
@@ -63,7 +64,7 @@ Written 2026-11-23. Module 5 milestone: Docker + AWS deployment, login, logging
   built for `linux/amd64` for the cloud (the Mac is ARM).
 - **Logs** go to stdout as JSON; Docker keeps them locally, CloudWatch collects them in AWS.
 
-## 4. AWS services (likely; confirm when we reach the cloud step)
+## 4. AWS services (first guess; the deployment plan is `docs/notes/module5_aws_plan.md`)
 
 | Need | Service | Notes |
 |---|---|---|
@@ -75,8 +76,9 @@ Written 2026-11-23. Module 5 milestone: Docker + AWS deployment, login, logging
 | Permissions | **IAM** | Instance / task role with only: read the S3 data prefix, read the one secret, write logs, pull from ECR. No access keys on the server. Root account with MFA, a separate admin user for daily work. |
 | Network | VPC default, security group | Open only the UI port (and SSH from your IP for EC2); HTTPS via a load balancer or a reverse proxy is a later step. |
 
-Cost guardrails before creating anything: AWS Budgets alert, region fixed to `ap-south-1`,
-stop or delete resources after demos.
+Cost guardrails before creating anything: AWS Budgets alert, region fixed to `ap-southeast-2`,
+stop or delete resources after demos. App Runner is out: an organization SCP denies it in this
+account, and AWS closed it to new customers from 2026-04-30.
 
 ## 5. Steps
 
@@ -87,8 +89,8 @@ stop or delete resources after demos.
 | 3 | FastAPI `/health`, `/ask`, `/datasets`; Streamlit UI calling the API | **Done**: `service.py`, `api/main.py`, `ui/app.py` |
 | 4 | Dockerfiles + `docker-compose.yml`; amd64 build | **Done**: `docker/Dockerfile` (targets `api`, `ui`); amd64 API image answered a question under emulation |
 | 5 | Structured JSON request logging | **Done**: `request_log.py`; one line per `/ask`, secrets redacted |
-| 6 | AWS: account hygiene, ECR, S3 data, secret, EC2 (or Fargate), CloudWatch | public URL answers a question with Groq |
-| 7 | Login (milestone item); HTTPS | to plan after step 6 |
+| 6 | AWS: ECR, S3 data, secret, EC2, CloudWatch (plan: `module5_aws_plan.md`, waiting for approval) | public URL answers a question with Groq |
+| 7 | Login (milestone item); HTTPS | options in `module5_aws_plan.md`; decision pending |
 
 ## 6. Running it locally
 
