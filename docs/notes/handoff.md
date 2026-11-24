@@ -1,4 +1,4 @@
-# Handoff: DataCopilot, state as of 2026-11-18
+# Handoff: DataCopilot, state as of 2026-11-18 (section 1b and module status updated 2026-11-24)
 
 For a fresh Claude Code session on a new machine (MacBook M2, 16 GB). Read this first,
 then `README.md`, `data/questions/README.md` and `data/features/README.md`.
@@ -61,6 +61,88 @@ If `build_questions.py --check` reports "stored gold_answer differs", the rebuil
 not identical to the original (e.g. a newer Jolpica F1 dump or Cricsheet update). Do not
 blindly rebuild answers: diff first, then decide.
 
+## 1b. Continuing on the Windows laptop (x86) and the AWS deployment
+
+Added 2026-11-24. The deployment runs in AWS **Sydney (`ap-southeast-2`)**, account
+131362574091, stack `datacopilot`; design and costs in `docs/notes/module5_aws_plan.md`.
+Everything is recreated or deleted with the scripts in `infra/` (bash: use **Git Bash**, which
+comes with Git for Windows, or WSL; not PowerShell).
+
+**Install** (Windows 11, x86):
+
+| Tool | How | Check |
+|---|---|---|
+| Git for Windows (includes Git Bash) | git-scm.com | `git --version` |
+| Python 3.13 | python.org installer ("Add to PATH") | `py -3.13 --version` |
+| Docker Desktop (WSL 2 backend) | docker.com; on x86 the `linux/amd64` images build natively, no emulation | `docker --version`, `docker compose version` |
+| AWS CLI v2 | MSI from aws.amazon.com/cli | `aws --version` |
+| Session Manager plugin | Windows installer from the AWS Systems Manager docs | `session-manager-plugin --version` |
+| Ollama (optional; local LLM on the RTX 4060) | ollama.com, then `ollama pull qwen2.5-coder:7b` | only needed for `LLM_PROVIDER=ollama` |
+
+**Repo and Python** (Git Bash):
+
+```bash
+git clone https://github.com/mritunjaySharma05/datacopilot.git && cd datacopilot
+git config core.autocrlf false        # .gitattributes keeps scripts LF anyway; this avoids noise
+py -3.13 -m venv .venv && source .venv/Scripts/activate
+pip install -r requirements.txt
+pytest                                 # infra bash tests run in Git Bash; skipped where bash is missing
+```
+
+Restore `CLAUDE.md` and `.claude/settings.json` as described in section 1.
+
+**AWS login** (credentials stay in your user profile, never in the repo):
+
+```bash
+aws login                              # browser sign-in; profile "default"
+aws configure set region ap-southeast-2
+aws sts get-caller-identity            # account 131362574091, role AccountFullAccessRole
+```
+
+**Recreate `.env`** (gitignored; never paste its values into chat, commits or shared drives):
+
+```bash
+cp .env.example .env                   # then fill in the values below in an editor
+```
+
+| Key | Where the value comes from |
+|---|---|
+| `LLM_PROVIDER=groq`, `GROQ_MODEL=openai/gpt-oss-120b` | fixed values |
+| `GROQ_API_KEY` | console.groq.com -> API Keys (create a new key if the old one is not in your password manager) |
+| `SITE_HOSTNAME` | your DuckDNS subdomain, e.g. `name.duckdns.org` |
+| `DUCKDNS_TOKEN` | duckdns.org account page (top of the page after sign-in) |
+| `ALARM_EMAIL` | where alarm and budget emails go |
+| `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | the site login (password at least 12 characters; keep it in a password manager) |
+| `BUDGET_USD` | 30 |
+
+The running server does not need your `.env`: its secrets are in SSM Parameter Store. `.env` is
+only read by `infra/deploy.sh` (and by local runs).
+
+**Data:** `deploy.sh` uploads `data/processed/` and refuses to run without it. Either rebuild it
+(section 1) or copy the deployed copy back from S3 (same files):
+
+```bash
+aws s3 sync s3://datacopilot-131362574091-apse2/data/ data/processed/
+```
+
+**Commands** (Git Bash, from the repo root):
+
+```bash
+infra/deploy.sh     # create or update everything; pushes images tagged with the git commit
+infra/status.sh     # stack, instance state, URL check, alarm, remaining AWS credits
+infra/stop.sh       # stop the instance between demos (~$0.17/day instead of ~$0.81/day)
+infra/start.sh      # start it again; the app comes up by itself in 2-3 minutes
+infra/delete.sh     # delete EVERYTHING (type "datacopilot" to confirm); nothing billable is left
+aws logs tail /datacopilot/api --follow                       # one JSON line per question
+aws ssm start-session --target $(aws cloudformation describe-stacks --stack-name datacopilot \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)   # shell, no SSH
+```
+
+**Credits:** the account is on the AWS Free plan ($120 credits on 2026-11-24, plan ends
+2027-05-23; AWS closes a Free-plan account when either runs out unless it is upgraded). Run
+`infra/status.sh` to see the balance; stop the instance when not demoing and run
+`infra/delete.sh` when Module 5 is assessed.
+
 ---
 
 ## 2. Module status
@@ -70,8 +152,9 @@ blindly rebuild answers: diff first, then decide.
 | 1. Proposal, charter, architecture, repo setup | Submitted |
 | 2. Research, design, basic prototype | Submitted |
 | 3. Data collection, cleaning, EDA, question sets, features | Submitted (report: `docs/reports/DataCopilot_Module3_Submission.pdf`, committed 2026-11-12) |
-| 4. Answerability classifier + baseline vs validated experiments | **In progress.** Classifier trained (step 2 done 2026-11-17); experiments next |
-| 5-8 | Not started |
+| 4. Answerability classifier + baseline vs validated experiments | Report done, awaiting submission (`docs/reports/DataCopilot_Module4_Submission.pdf`) |
+| 5. Docker + AWS deployment, login, logging | **In progress** (2026-11-24): app in Docker, Groq provider, JSON logs done; AWS deployment via `infra/` (section 1b); plan `docs/notes/module5_plan.md`, `docs/notes/module5_aws_plan.md` |
+| 6-8 | Not started (Module 6 notes: `docs/notes/module6_plan.md`) |
 
 ### What exists (by area)
 
