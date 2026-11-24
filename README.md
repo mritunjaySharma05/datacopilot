@@ -22,7 +22,7 @@ AI data tools often run LLM-generated queries without checking them, which can r
 | English + Hinglish questions | Planned |
 | Automatic dataset insights | Planned |
 | Answerability classifier | Done |
-| SQL validation (schema + read-only) | Started |
+| SQL validation (schema + read-only) | Done |
 | Auto chart selection (Plotly) | Planned |
 | Cloud deployment (Docker, AWS/GCP) | Planned |
 
@@ -44,7 +44,7 @@ Python · Pandas · DuckDB · SQLite / PostgreSQL · SQLAlchemy · scikit-learn 
 
 ## Project status
 
-Modules 1–3 submitted. Module 4 (answerability classifier + baseline vs validated experiments) report done: [DataCopilot_Module4_Submission.pdf](docs/reports/DataCopilot_Module4_Submission.pdf). Progress per module: [docs/planning/milestones.md](docs/planning/milestones.md).
+Modules 1–4 submitted (Module 4 report: [DataCopilot_Module4_Submission.pdf](docs/reports/DataCopilot_Module4_Submission.pdf)). Module 5 (cloud deployment and validation) in progress: on the 90 Module 4 test questions, Groq gpt-oss-120b scores 51.1% vs Ollama 33.3% strict (exact McNemar p = 0.0004; [details](docs/results/groq_vs_ollama.md)). Progress per module: [docs/planning/milestones.md](docs/planning/milestones.md).
 
 ## Module 4 results
 

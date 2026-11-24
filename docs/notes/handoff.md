@@ -152,7 +152,7 @@ aws ssm start-session --target $(aws cloudformation describe-stacks --stack-name
 | 1. Proposal, charter, architecture, repo setup | Submitted |
 | 2. Research, design, basic prototype | Submitted |
 | 3. Data collection, cleaning, EDA, question sets, features | Submitted (report: `docs/reports/DataCopilot_Module3_Submission.pdf`, committed 2026-11-12) |
-| 4. Answerability classifier + baseline vs validated experiments | Report done, awaiting submission (`docs/reports/DataCopilot_Module4_Submission.pdf`) |
+| 4. Answerability classifier + baseline vs validated experiments | Submitted (`docs/reports/DataCopilot_Module4_Submission.pdf`) |
 | 5. Docker + AWS deployment, login, logging | **In progress** (2026-11-24): app in Docker, Groq provider, JSON logs done; AWS deployment via `infra/` (section 1b); plan `docs/notes/module5_plan.md`, `docs/notes/module5_aws_plan.md` |
 | 6-8 | Not started (Module 6 notes: `docs/notes/module6_plan.md`) |
 

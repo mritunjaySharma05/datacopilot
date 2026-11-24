@@ -5,8 +5,8 @@
 | 1 | Proposal, charter, architecture, repo setup | Submitted |
 | 2 | Requirements, research review, detailed design, basic prototype | Submitted |
 | 3 | BIRD dev set + CSV / Hinglish / unanswerable question sets, EDA | Submitted |
-| 4 | Answerability classifier + baseline vs validated pipeline experiments | Report done, awaiting submission (`docs/reports/DataCopilot_Module4_Submission.pdf`) |
-| 5 | Docker + AWS/GCP deployment, login, logging | Not started |
+| 4 | Answerability classifier + baseline vs validated pipeline experiments | Submitted |
+| 5 | Docker + AWS/GCP deployment, login, logging | In progress: cloud deployment and validation (Groq gpt-oss-120b 51.1% vs Ollama 33.3% strict, McNemar p = 0.0004) |
 | 6 | End-to-end integration, charts, auto insights | Not started |
 | 7 | Functional, performance, security, UAT testing; user guide | Not started |
 | 8 | Final report, presentation, live demo | Not started |
