@@ -60,6 +60,8 @@ More: [report (PDF)](docs/reports/DataCopilot_Module4_Submission.pdf) · [one-pa
 
 Module 5: Docker + AWS (Sydney), HTTPS with login, CloudWatch logging. [Architecture](docs/deployment/ARCHITECTURE.md) · [Deployment guide](docs/deployment/DEPLOYMENT_GUIDE.md) · [User guide](docs/deployment/USER_GUIDE.md)
 
+The Module 5 report is shared through the course portal only, not in this repo (its screenshots show AWS account details).
+
 ## Project structure
 
 ```

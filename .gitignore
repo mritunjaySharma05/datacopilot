@@ -33,3 +33,6 @@ CLAUDE.md
 
 # AWS deploy (infra/deploy.sh): temporary secret files
 infra/.secrets-tmp/
+
+# Module 5 report: submitted via the course portal only (screenshots show AWS account details)
+docs/reports/DataCopilot_Module5_*.pdf
