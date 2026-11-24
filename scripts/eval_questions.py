@@ -20,7 +20,13 @@ Usage:
     python scripts/eval_questions.py --modes validated --limit 5
     python scripts/eval_questions.py --rescore data/results/questions_*.csv --report R.md
                                      # re-run stored SQL, recompute metrics (no LLM)
+
+The LLM comes from LLM_PROVIDER in .env (ollama = the Module 4 runs, or groq). HTTP 429 rate
+limits are waited out (llm.RateLimitRetry). Runs with a provider other than ollama are saved as
+questions_<mode>-<provider>_<label>_<stamp>.csv, so the Module 4 scripts that pick the newest
+questions_<mode>_<label>_*.csv keep using the Ollama runs.
 """
+import functools
 import argparse
 import sys
 import time
@@ -35,6 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from datacopilot.pipeline.executor import run_query  # noqa: E402
+from datacopilot.pipeline.llm import LLMError, RateLimitRetry, get_provider  # noqa: E402
 from datacopilot.pipeline.profiler import get_schema, get_sqlite_schema  # noqa: E402
 from datacopilot.pipeline.runner import SQLAttemptError, answer  # noqa: E402
 from datacopilot.pipeline.sql_generator import generate_sql  # noqa: E402
@@ -188,10 +195,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.rescore:
         return rescore_files(args.rescore, args.questions_dir, args.processed_dir, args.report)
 
+    try:
+        provider = RateLimitRetry(get_provider())
+    except LLMError as err:
+        print(f"LLM error: {err}", file=sys.stderr)
+        return 1
+    generate = functools.partial(generate_sql, provider=provider)
+    llm = f"{provider.name}:{provider.model}"
+    suffix = "" if provider.name == "ollama" else f"-{provider.name}"
     questions = load_questions(args.sets, args.split, args.questions_dir)[: args.limit]
     datasets = Datasets(args.processed_dir)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     label = f"{'+'.join(args.sets)}_{args.split}"
+    print(f"LLM: {llm}")
     all_records = []
     for mode in args.modes:
         print(f"Mode: {mode} | sets: {', '.join(args.sets)} | split: {args.split} | questions: {len(questions)}")
@@ -199,19 +215,20 @@ def main(argv: list[str] | None = None) -> int:
         for i, row in enumerate(questions, 1):
             conn, schema = datasets(row["dataset"])
             try:
-                rec = evaluate_question(row, conn, schema, use_validator=mode == "validated")
+                rec = evaluate_question(row, conn, schema, use_validator=mode == "validated", generate=generate)
             except requests.ConnectionError:
-                print("Could not reach Ollama. Is it running? (check OLLAMA_HOST in .env)", file=sys.stderr)
+                print(f"Could not reach the LLM ({llm}). Is it running? (check .env)", file=sys.stderr)
                 return 1
-            records.append({**rec, "mode": mode})
+            records.append({**rec, "mode": mode, "llm": llm})
             mark = "OK  " if rec["strict"] else ("ok~ " if rec["relaxed"] else "FAIL")
             note = f" ({rec['error'][:70]})" if rec["error"] else ""
             print(f"[{i}/{len(questions)}] {mark} {rec['id']} {rec['seconds']:.1f}s{note}")
         df = pd.DataFrame(records)
-        out = args.out_dir / f"questions_{mode}_{label}_{stamp}.csv"
+        out = args.out_dir / f"questions_{mode}{suffix}_{label}_{stamp}.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(out, index=False)
-        print(f"{mode}: strict {df.strict.mean():.1%}, relaxed {df.relaxed.mean():.1%} | saved {out}\n")
+        print(f"{mode}: strict {df.strict.mean():.1%}, relaxed {df.relaxed.mean():.1%} | saved {out} "
+              f"| rate-limit waits so far {provider.waits} ({provider.waited_s:.0f} s)\n")
         all_records += records
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)

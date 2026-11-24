@@ -95,3 +95,51 @@ def test_groq_other_http_errors_propagate(monkeypatch):
     fake_post(monkeypatch, status=500)
     with pytest.raises(requests.HTTPError):
         GroqProvider(api_key=SECRET, model="m").complete("p")
+
+
+# --- RateLimitRetry ---
+
+class Flaky:
+    """Raises 429 `fail` times, then answers."""
+
+    name, model = "groq", "m"
+
+    def __init__(self, fail, retry_after=2.0):
+        self.fail, self.retry_after, self.calls = fail, retry_after, 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        if self.calls <= self.fail:
+            raise LLMRateLimitError("429", self.retry_after)
+        return f"answer to {prompt}"
+
+
+def test_rate_limit_retry_waits_and_retries_same_prompt():
+    from datacopilot.pipeline.llm import RateLimitRetry
+    slept = []
+    r = RateLimitRetry(Flaky(fail=2, retry_after=7.0), sleep=slept.append)
+    assert r.complete("p") == "answer to p"
+    assert slept == [7.0, 14.0] and r.waits == 2 and r.waited_s == 21.0
+    assert (r.name, r.model) == ("groq", "m") and describe(r) == {"provider": "groq", "model": "m"}
+
+
+def test_rate_limit_retry_minimum_cap_and_give_up():
+    from datacopilot.pipeline.llm import RateLimitRetry
+    slept = []
+    r = RateLimitRetry(Flaky(fail=99, retry_after=None), max_attempts=3, min_wait_s=5, max_wait_s=8,
+                       sleep=slept.append)
+    with pytest.raises(LLMRateLimitError):
+        r.complete("p")
+    assert slept == [5, 8]  # 5*1, min(5*2, 8); no sleep after the last attempt
+
+
+def test_rate_limit_retry_passes_other_errors_through():
+    from datacopilot.pipeline.llm import RateLimitRetry
+
+    class Down:
+        name, model = "groq", "m"
+
+        def complete(self, prompt):
+            raise LLMError("bad key")
+    with pytest.raises(LLMError, match="bad key"):
+        RateLimitRetry(Down(), sleep=lambda s: None).complete("p")

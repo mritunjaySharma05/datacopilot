@@ -160,9 +160,47 @@ def test_main_writes_csv_per_mode_and_report(tmp_path, monkeypatch):
     db.execute("CREATE TABLE crop_production AS SELECT * FROM (VALUES ('Rice', 15.0), ('Wheat', 7.0)) t(crop, production)")
     monkeypatch.setattr(eq.Datasets, "__call__", lambda self, ds: (db, SCHEMA))
     monkeypatch.setattr(eq, "generate_sql", lambda question, schema, **kw: GOLD_SQL)
+    monkeypatch.setattr(eq, "get_provider", lambda: FakeProvider("ollama"))
     report_path = tmp_path / "report.md"
     assert eq.main(["--sets", "csv", "--questions-dir", str(qdir), "--out-dir", str(out),
                     "--report", str(report_path)]) == 0
     files = sorted(p.name.split("_")[1] for p in out.glob("questions_*.csv"))
     assert files == ["baseline", "validated"]
     assert "| **all** | 1 | 100.0% | 100.0% | 100.0% | 100.0% |" in report_path.read_text()
+
+
+class FakeProvider:
+    def __init__(self, name):
+        self.name, self.model = name, f"{name}-model"
+
+    def complete(self, prompt):
+        return "SELECT 1"
+
+
+def test_main_names_non_ollama_runs_by_provider_and_records_llm(tmp_path, monkeypatch):
+    import pandas as pd
+    qdir, out = tmp_path / "q", tmp_path / "out"
+    write_jsonl(qdir / SET_FILES["csv"], [{
+        "id": "crop-001", "dataset": "crop", "question": "Total production per crop?", "gold_sql": GOLD_SQL,
+        "gold_answer": [["Rice", 15], ["Wheat", 7]], "answerable": True, "unanswerable_type": None,
+        "difficulty": "medium", "split": "test"}])
+    db = duckdb.connect()
+    db.execute("CREATE TABLE crop_production AS SELECT * FROM (VALUES ('Rice', 15.0), ('Wheat', 7.0)) t(crop, production)")
+    monkeypatch.setattr(eq.Datasets, "__call__", lambda self, ds: (db, SCHEMA))
+    monkeypatch.setattr(eq, "generate_sql", lambda question, schema, **kw: GOLD_SQL)
+    monkeypatch.setattr(eq, "get_provider", lambda: FakeProvider("groq"))
+    assert eq.main(["--sets", "csv", "--modes", "validated", "--questions-dir", str(qdir),
+                    "--out-dir", str(out)]) == 0
+    [path] = out.glob("questions_*.csv")
+    assert path.name.startswith("questions_validated-groq_csv_test_")
+    assert pd.read_csv(path).llm.tolist() == ["groq:groq-model"]
+    # the Module 4 lookup (newest questions_validated_<label>_*.csv) does not pick it up
+    assert not list(out.glob("questions_validated_csv_test_*.csv"))
+
+
+def test_main_reports_llm_configuration_error(monkeypatch, capsys):
+    def broken():
+        raise eq.LLMError("LLM_PROVIDER=groq needs GROQ_API_KEY in the environment (.env).")
+    monkeypatch.setattr(eq, "get_provider", broken)
+    assert eq.main(["--sets", "csv"]) == 1
+    assert "GROQ_API_KEY" in capsys.readouterr().err

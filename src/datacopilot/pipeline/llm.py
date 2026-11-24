@@ -9,8 +9,9 @@ and the retry stay in sql_generator / runner, so they are identical for all prov
 API keys are read from the environment only and never appear in repr() or describe().
 """
 import os
+import time
 from dataclasses import dataclass, field
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 import requests
 
@@ -98,6 +99,45 @@ class GroqProvider:
             raise LLMError(f"Groq rejected the request (HTTP {response.status_code}): check GROQ_API_KEY.")
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
+
+
+@dataclass
+class RateLimitRetry:
+    """Wrap a provider for batch runs (evaluations): on HTTP 429 wait, then retry the same prompt.
+
+    The wait is the provider's Retry-After (at least `min_wait_s`), growing with each attempt
+    and capped at `max_wait_s`. After `max_attempts` the LLMRateLimitError is raised. Not used
+    by the API, which returns 429 to the user instead of making them wait.
+    """
+
+    inner: LLMProvider
+    max_attempts: int = 12
+    min_wait_s: float = 5.0
+    max_wait_s: float = 300.0
+    sleep: Callable[[float], None] = field(default=time.sleep, repr=False)
+    waits: int = field(default=0, init=False)
+    waited_s: float = field(default=0.0, init=False)
+
+    @property
+    def name(self) -> str:
+        return self.inner.name
+
+    @property
+    def model(self) -> str:
+        return self.inner.model
+
+    def complete(self, prompt: str) -> str:
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                return self.inner.complete(prompt)
+            except LLMRateLimitError as err:
+                if attempt == self.max_attempts:
+                    raise
+                wait = min(max(err.retry_after_s or 0.0, self.min_wait_s) * attempt, self.max_wait_s)
+                self.waits += 1
+                self.waited_s += wait
+                self.sleep(wait)
+        raise AssertionError("unreachable")
 
 
 def _float_or_none(value: str | None) -> float | None:
