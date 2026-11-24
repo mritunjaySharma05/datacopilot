@@ -166,3 +166,10 @@ def test_no_aws_account_id_in_tracked_files():
         if path.suffix in {".md", ".sh", ".yml", ".yaml", ".py", ".txt", ".json", ".example", ""} and path.is_file():
             hits += [f"{name}: {m.group(0)}" for m in pattern.finditer(path.read_text(errors="ignore"))]
     assert not hits, hits
+
+
+def test_only_redacted_module5_report_can_be_committed():
+    def ignored(path: str) -> bool:
+        return subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT).returncode == 0
+    assert ignored("docs/reports/DataCopilot_Module5_Report.pdf")          # unredacted: portal only
+    assert not ignored("docs/reports/DataCopilot_Module5_Submission.pdf")  # redacted copy

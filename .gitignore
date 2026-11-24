@@ -34,5 +34,7 @@ CLAUDE.md
 # AWS deploy (infra/deploy.sh): temporary secret files
 infra/.secrets-tmp/
 
-# Module 5 report: submitted via the course portal only (screenshots show AWS account details)
+# Module 5 report: only the redacted copy (AWS account ID blacked out) is committed;
+# the unredacted report goes to the course portal only
 docs/reports/DataCopilot_Module5_*.pdf
+!docs/reports/DataCopilot_Module5_Submission.pdf

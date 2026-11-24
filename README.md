@@ -44,7 +44,7 @@ Python · Pandas · DuckDB · SQLite / PostgreSQL · SQLAlchemy · scikit-learn 
 
 ## Project status
 
-Modules 1–4 submitted (Module 4 report: [DataCopilot_Module4_Submission.pdf](docs/reports/DataCopilot_Module4_Submission.pdf)). Module 5 (cloud deployment and validation) in progress: on the 90 Module 4 test questions, Groq gpt-oss-120b scores 51.1% vs Ollama 33.3% strict (exact McNemar p = 0.0004; [details](docs/results/groq_vs_ollama.md)). Progress per module: [docs/planning/milestones.md](docs/planning/milestones.md).
+Modules 1–4 submitted (Module 4 report: [DataCopilot_Module4_Submission.pdf](docs/reports/DataCopilot_Module4_Submission.pdf)). Module 5 (cloud deployment and validation) done, report in [docs/reports/](docs/reports/DataCopilot_Module5_Submission.pdf): on the 90 Module 4 test questions, Groq gpt-oss-120b scores 51.1% vs Ollama 33.3% strict (exact McNemar p = 0.0004; [details](docs/results/groq_vs_ollama.md)). Progress per module: [docs/planning/milestones.md](docs/planning/milestones.md).
 
 ## Module 4 results
 
@@ -58,9 +58,7 @@ More: [report (PDF)](docs/reports/DataCopilot_Module4_Submission.pdf) · [one-pa
 
 ## Deployment
 
-Module 5: Docker + AWS (Sydney), HTTPS with login, CloudWatch logging. [Architecture](docs/deployment/ARCHITECTURE.md) · [Deployment guide](docs/deployment/DEPLOYMENT_GUIDE.md) · [User guide](docs/deployment/USER_GUIDE.md)
-
-The Module 5 report is shared through the course portal only, not in this repo (its screenshots show AWS account details).
+Module 5: Docker + AWS (Sydney), HTTPS with login, CloudWatch logging. [Architecture](docs/deployment/ARCHITECTURE.md) · [Deployment guide](docs/deployment/DEPLOYMENT_GUIDE.md) · [User guide](docs/deployment/USER_GUIDE.md) · [Module 5 report (PDF)](docs/reports/DataCopilot_Module5_Submission.pdf)
 
 ## Project structure
 
