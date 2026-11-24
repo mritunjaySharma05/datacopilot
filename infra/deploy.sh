@@ -37,6 +37,12 @@ trap 'rm -rf "$TMP"' EXIT
 # ---------------------------------------------------------------- 1. stack
 info "1/6 CloudFormation stack"
 aws cloudformation validate-template --template-body file://infra/datacopilot.yaml >/dev/null
+STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" --query 'Stacks[0].StackStatus' --output text 2>/dev/null | tr -d '\r' || true)
+if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then   # a failed first create cannot be updated; it holds no resources
+  info "    removing the failed first attempt (ROLLBACK_COMPLETE)"
+  aws cloudformation delete-stack --stack-name "$STACK"
+  aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+fi
 aws cloudformation deploy --stack-name "$STACK" --template-file infra/datacopilot.yaml \
   --capabilities CAPABILITY_NAMED_IAM --no-fail-on-empty-changeset \
   --parameter-overrides "SiteHostname=$SITE_HOSTNAME" "AlarmEmail=$ALARM_EMAIL" "BudgetAmountUsd=$BUDGET_USD"

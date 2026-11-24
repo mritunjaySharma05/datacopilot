@@ -143,3 +143,13 @@ def test_gitattributes_forces_lf_for_scripts_and_infra():
         assert re.search(rf"^{re.escape(pattern)}\s+text eol=lf", attrs, flags=re.M), pattern
     for path in [*SCRIPTS, INFRA / "Caddyfile", INFRA / "compose.aws.yml"]:
         assert b"\r\n" not in path.read_bytes(), path.name
+
+
+def test_security_group_descriptions_use_allowed_characters():
+    # EC2 allows only a-zA-Z0-9. _-:/()#,@[]+=&;{}!$* in rule and group descriptions
+    allowed = re.compile(r"^[a-zA-Z0-9. _\-:/()#,@\[\]+=&;{}!$*]*$")
+    group = TEMPLATE.split("  WebSecurityGroup:")[1].split("  LaunchTemplate:")[0]
+    descriptions = re.findall(r"Description:\s*(.+)", group)
+    assert len(descriptions) == 3
+    for text in descriptions:
+        assert allowed.match(text.strip()), text
