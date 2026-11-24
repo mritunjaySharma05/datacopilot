@@ -10,6 +10,7 @@
 | `heldout.md`, `heldout_metrics.json` | `scripts/eval_heldout.py` | Scores on the 30-question human held-out set, fair `n_words` ablation, every misclassified question |
 | `questions_test.md`, `questions_heldout.md` | `scripts/eval_questions.py --report ...` | SQL pipeline accuracy on our answerable questions (test split; held-out answerable 15), validated and baseline |
 | `gate.md` | `scripts/eval_gate.py` | Answerability gate experiment: refusals, invented answers, end-to-end accuracy with vs without the gate |
+| `groq_vs_ollama.md` | `scripts/compare_providers.py` | Module 5 validation: Groq gpt-oss-120b vs Module 4 Ollama on the same 90 test questions, by dataset and language, exact McNemar |
 | `bird.md` | `scripts/compare_bird.py` | BIRD dev 300-question sample: validated vs baseline by database and difficulty, outcomes, exact McNemar |
 | `modes_comparison.md` | `scripts/compare_modes.py` | Paired validated vs baseline: accuracy by dataset and language, disagreements, exact McNemar test |
 
@@ -175,3 +176,35 @@ Exact McNemar (paired): validated only right 4, baseline only right 0, p = 0.125
 - By database, the differences are 0 to +6.2 points (thrombosis_prediction); accuracy
   ranges from 27.8% (california_schools) to 84.0% (superhero). By difficulty: simple
   61.2%, moderate 40.7%, challenging 35.5% (validated).
+
+## Notes: Module 5 validation, Groq vs Ollama (2026-11-24)
+
+Same 90 answerable test-split questions as Module 4 step 3 (60 English, 30 Hinglish), validated
+mode only, run locally with `LLM_PROVIDER=groq` (`openai/gpt-oss-120b`, chosen on train-split
+questions only, see `docs/notes/module5_plan.md`). Prompt, temperature 0, validator and one retry
+are unchanged; only the LLM differs. The Ollama numbers are the stored Module 4 run (rescored
+with the current relaxed rules; strict unchanged). Full report: `groq_vs_ollama.md`.
+
+| Metric | Ollama qwen2.5-coder:7b (Module 4) | Groq gpt-oss-120b (Module 5) | Exact McNemar |
+|---|---|---|---|
+| Strict (primary) | 33.3% (30/90) | **51.1%** (46/90) | Groq only right 18, Ollama only right 2, **p = 0.0004** |
+| Relaxed (secondary, post hoc) | 47.8% | **61.1%** | 16 vs 4, p = 0.012 |
+| English / Hinglish strict | 36.7% / 26.7% | 51.7% / 50.0% | |
+| Validation failures after retry | 5 | 0 | |
+
+- **The hosted model is clearly better**: strict accuracy improves on F1 (13.0% to 43.5%), IPL
+  (27.3% to 59.1%) and Olist (50.0% to 59.1%); crop is unchanged on strict (43.5%) but higher on
+  relaxed. The Hinglish gap almost closes (50.0% vs 51.7% English).
+- **Two questions were lost**: `crop-012` (right value, but extra district/season columns, so
+  strict fails and relaxed passes) and `olist-036` (grouped by the Portuguese category name
+  instead of the English one). Groq often adds context columns: 9 of its answers are relaxed-only.
+- **Rate limits**: 74 HTTP 429 waits (714 s of the 831 s total) on the free plan's 8,000 tokens
+  per minute, all recovered by `RateLimitRetry`; no question failed on a rate limit. Without the
+  waits, about 1.3 s per question on average.
+- **Caveats**: one run of a hosted reasoning model; temperature 0 does not make it fully
+  deterministic, so a rerun may differ by a few questions (the p-value leaves a wide margin). The
+  test split was used once for this comparison and nothing was tuned on it. Module 4's reported
+  numbers remain the Ollama numbers; this table is the Module 5 validation of the deployed
+  configuration. Since `.env` now sets `LLM_PROVIDER=groq`, rerunning Module 4 scripts needs
+  `LLM_PROVIDER=ollama`.
+

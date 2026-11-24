@@ -128,6 +128,8 @@ libraries), UI 813 MB.
   model of the same family with the same limits. Groq answers take about 1-2 s per question in
   Docker vs 10-18 s for local Ollama. Module 4 numbers are Ollama numbers; if Groq results are
   reported, rerun the evaluation with Groq.
+  **Done 2026-11-24**: on the 90 Module 4 test questions Groq scores 51.1% strict vs Ollama 33.3%
+  (exact McNemar p = 0.0004); `docs/results/groq_vs_ollama.md`.
 - **Groq free-plan limits** (from the API's rate-limit headers): **8,000 tokens per minute and
   1,000 requests per day, per model**. Prompts are about 200-1,350 tokens (schema included) and
   the gpt-oss models also spend tokens on hidden reasoning, so a burst of a few questions per
