@@ -5,7 +5,7 @@ DuckDNS `datacopilot.duckdns.org` + basic auth; budget $30/month). Verified: Let
 certificate, HTTP->HTTPS redirect, 401 without login, ports 22/8000/8501 closed, three questions
 answered through the cloud API with Groq, JSON lines in CloudWatch with no secrets in any log group.
 First attempt failed on an apostrophe in a security-group rule description (fixed in `0c45f57`).
-Region **ap-southeast-2 (Sydney)**, account 131362574091, CLI profile `default`
+Region **ap-southeast-2 (Sydney)**, account `<account-id>`, CLI profile `default`
 (role `AccountFullAccessRole`).
 
 ## 0. Account facts (read-only checks, 2026-11-24)

@@ -153,3 +153,16 @@ def test_security_group_descriptions_use_allowed_characters():
     assert len(descriptions) == 3
     for text in descriptions:
         assert allowed.match(text.strip()), text
+
+
+def test_no_aws_account_id_in_tracked_files():
+    """Docs and scripts use <account-id>; the scripts read the real one at runtime."""
+    files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.split()
+    pattern = re.compile(r"datacopilot-\d{12}-apse2|\d{12}\.dkr\.ecr|account[^\n\d]{0,20}\d{12}\b|arn:aws:[a-z0-9-]+:[a-z0-9-]*:\d{12}:",
+                         re.IGNORECASE)
+    hits = []
+    for name in files:
+        path = ROOT / name
+        if path.suffix in {".md", ".sh", ".yml", ".yaml", ".py", ".txt", ".json", ".example", ""} and path.is_file():
+            hits += [f"{name}: {m.group(0)}" for m in pattern.finditer(path.read_text(errors="ignore"))]
+    assert not hits, hits

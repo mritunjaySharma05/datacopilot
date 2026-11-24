@@ -64,7 +64,7 @@ blindly rebuild answers: diff first, then decide.
 ## 1b. Continuing on the Windows laptop (x86) and the AWS deployment
 
 Added 2026-11-24. The deployment runs in AWS **Sydney (`ap-southeast-2`)**, account
-131362574091, stack `datacopilot`; design and costs in `docs/notes/module5_aws_plan.md`.
+`<account-id>`, stack `datacopilot`; design and costs in `docs/notes/module5_aws_plan.md`.
 Everything is recreated or deleted with the scripts in `infra/` (bash: use **Git Bash**, which
 comes with Git for Windows, or WSL; not PowerShell).
 
@@ -96,7 +96,7 @@ Restore `CLAUDE.md` and `.claude/settings.json` as described in section 1.
 ```bash
 aws login                              # browser sign-in; profile "default"
 aws configure set region ap-southeast-2
-aws sts get-caller-identity            # account 131362574091, role AccountFullAccessRole
+aws sts get-caller-identity            # account <account-id>, role AccountFullAccessRole
 ```
 
 **Recreate `.env`** (gitignored; never paste its values into chat, commits or shared drives):
@@ -122,7 +122,8 @@ only read by `infra/deploy.sh` (and by local runs).
 (section 1) or copy the deployed copy back from S3 (same files):
 
 ```bash
-aws s3 sync s3://datacopilot-131362574091-apse2/data/ data/processed/
+aws s3 sync s3://datacopilot-<account-id>-apse2/data/ data/processed/
+# <account-id>: aws sts get-caller-identity --query Account --output text
 ```
 
 **Commands** (Git Bash, from the repo root):
