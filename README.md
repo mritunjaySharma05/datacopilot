@@ -56,6 +56,10 @@ Modules 1–4 submitted (Module 4 report: [DataCopilot_Module4_Submission.pdf](d
 
 More: [report (PDF)](docs/reports/DataCopilot_Module4_Submission.pdf) · [one-page summary](docs/results/module4_summary.md) · [model card](docs/results/MODEL_CARD.md) · [notebook](notebooks/module4_model_development.ipynb) · [figures](docs/results/figures/)
 
+## Deployment
+
+Module 5: Docker + AWS (Sydney), HTTPS with login, CloudWatch logging. [Architecture](docs/deployment/ARCHITECTURE.md) · [Deployment guide](docs/deployment/DEPLOYMENT_GUIDE.md) · [User guide](docs/deployment/USER_GUIDE.md)
+
 ## Project structure
 
 ```
