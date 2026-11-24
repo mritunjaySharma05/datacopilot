@@ -1,0 +1,7 @@
+# Keep Unix line endings for files that run on Linux or in bash, also on Windows checkouts
+# (Git for Windows would otherwise turn them into CRLF and break the scripts on the server).
+*.sh            text eol=lf
+infra/**        text eol=lf
+docker/**       text eol=lf
+docker-compose.yml text eol=lf
+*.py            text eol=lf

@@ -135,3 +135,11 @@ def test_require_env_names_the_missing_key(tmp_path):
     out = subprocess.run([BASH, "-c", "source infra/lib.sh; require_env GROQ_API_KEY SITE_HOSTNAME"], cwd=ROOT,
                          capture_output=True, text=True, env={"ENV_FILE": str(env), "PATH": "/usr/bin:/bin"})
     assert out.returncode != 0 and "set SITE_HOSTNAME" in out.stderr
+
+
+def test_gitattributes_forces_lf_for_scripts_and_infra():
+    attrs = (ROOT / ".gitattributes").read_text()
+    for pattern in ("*.sh", "infra/**", "docker/**"):
+        assert re.search(rf"^{re.escape(pattern)}\s+text eol=lf", attrs, flags=re.M), pattern
+    for path in [*SCRIPTS, INFRA / "Caddyfile", INFRA / "compose.aws.yml"]:
+        assert b"\r\n" not in path.read_bytes(), path.name
